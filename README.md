@@ -7,7 +7,7 @@
 在支持文件操作的 AI 助手中输入：
 
 ```text
-Set up rs-zero AI tools for this project from <repo-url>
+Set up rs-zero AI tools for this project from https://github.com/bughey/rs-zero-ai-context.git
 ```
 
 AI 应完成：
@@ -48,14 +48,14 @@ AI Assistant
 Codex 自动读取项目根目录的 `AGENTS.md`。如果目标项目已有 `AGENTS.md`，合并本仓库的 rs-zero 规则，不要直接覆盖已有规则。
 
 ```bash
-git submodule add <repo-url> .codex/rs-zero-ai-context
+git submodule add https://github.com/bughey/rs-zero-ai-context.git .codex/rs-zero-ai-context
 cp .codex/rs-zero-ai-context/AGENTS.md AGENTS.md
 ```
 
 ### Claude Code
 
 ```bash
-git submodule add <repo-url> .claude/rs-zero-ai-context
+git submodule add https://github.com/bughey/rs-zero-ai-context.git .claude/rs-zero-ai-context
 ```
 
 在项目级 Claude 指令中加入：优先读取 `.claude/rs-zero-ai-context/00-instructions.md`，需要详细模式时读取 `.claude/rs-zero-ai-context/references/`。
@@ -63,7 +63,7 @@ git submodule add <repo-url> .claude/rs-zero-ai-context
 ### GitHub Copilot
 
 ```bash
-git submodule add <repo-url> .github/rs-zero-ai-context
+git submodule add https://github.com/bughey/rs-zero-ai-context.git .github/rs-zero-ai-context
 ln -s rs-zero-ai-context/00-instructions.md .github/copilot-instructions.md
 ```
 
@@ -72,7 +72,7 @@ ln -s rs-zero-ai-context/00-instructions.md .github/copilot-instructions.md
 ### Cursor
 
 ```bash
-git submodule add <repo-url> .cursor/rs-zero-ai-context
+git submodule add https://github.com/bughey/rs-zero-ai-context.git .cursor/rs-zero-ai-context
 ```
 
 将 `00-instructions.md`、`workflows.md`、`tools.md`、`patterns.md` 添加到 Cursor rules。
@@ -80,7 +80,7 @@ git submodule add <repo-url> .cursor/rs-zero-ai-context
 ### Windsurf
 
 ```bash
-git submodule add <repo-url> .windsurf/rs-zero-ai-context
+git submodule add https://github.com/bughey/rs-zero-ai-context.git .windsurf/rs-zero-ai-context
 ```
 
 将 `00-instructions.md` 作为全局规则，将 `references/` 作为按需参考。
