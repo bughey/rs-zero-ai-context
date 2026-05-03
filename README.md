@@ -7,7 +7,7 @@
 在支持文件操作的 AI 助手中输入：
 
 ```text
-Set up rs-zero AI tools for this project from https://github.com/bughey/rs-zero-ai-context.git
+Set up rs-zero AI tools for this project from https://github.com/bughey/rs-zero-ai-context
 ```
 
 AI 应完成：
