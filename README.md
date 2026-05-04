@@ -35,6 +35,7 @@ AI Assistant
    │  ├─ model-cache-patterns.md
    │  ├─ resilience-patterns.md
    │  ├─ distributed-lock-patterns.md
+   │  ├─ service-group-patterns.md
    │  ├─ observability-patterns.md
    │  ├─ production-checklist.md
    │  └─ troubleshooting.md
@@ -123,7 +124,7 @@ Review this rs-zero service for production readiness: features, timeout, breaker
 - **spec-first**：REST 先写 `.api`，RPC 先写 `.proto`，model/cache 先写 SQL schema。
 - **rzcli-first**：优先用 `rzcli` 生成骨架，不手写大段生成代码。
 - **feature-aware**：需要 Redis、RPC、韧性、可观测性、OTLP、DB 时显式声明 Cargo feature。
-- **production-first**：默认考虑 timeout、breaker、limiter/shedder、distributed lock、metrics/tracing、health/readiness 和外部依赖边界。
+- **production-first**：默认考虑 timeout、breaker、limiter/shedder、distributed lock、service group、metrics/tracing、health/readiness 和外部依赖边界。
 - **verification-first**：完成后运行匹配范围的 `cargo fmt`、`cargo check`、`cargo test`、`cargo clippy`。
 
 ## 常用命令

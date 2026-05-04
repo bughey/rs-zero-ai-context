@@ -31,6 +31,14 @@
 - period limiter 自然周期需求已对齐。
 - Linux CPU provider 已在目标平台验证；非 Linux 已说明降级。
 
+## Service Group
+
+- 同进程多服务已统一接入 `ServiceGroup`。
+- REST 使用 `RestService`，RPC 使用 `TonicService` / `TonicHealthService`。
+- worker / scheduler 已监听 `ShutdownToken`。
+- 不依赖 service group 启动顺序；readiness/health 已覆盖依赖准备。
+- `shutdown_timeout` 足够完成清理，但不会无限阻塞退出。
+
 ## Observability
 
 - metrics label 低基数。

@@ -185,7 +185,26 @@ scripts/external-integration.sh redis-lock
 
 参考：`references/distributed-lock-patterns.md`。
 
-## 9. Add Observability / OTLP
+
+## 9. Add Service Group
+
+1. 确认是否需要同进程运行 REST、RPC、worker 或 scheduler。
+2. 使用 `ServiceGroup` 作为生命周期入口。
+3. REST 使用 `RestService` 包装 `RestServer`。
+4. RPC 使用 `TonicService` 或 `TonicHealthService`。
+5. worker 使用 `add_fn` 或实现 `Service`。
+6. worker 必须监听 `ShutdownToken`。
+7. 补 service group 生命周期测试。
+
+验证示例：
+
+```bash
+cargo test -p rs-zero --test service_group
+```
+
+参考：`references/service-group-patterns.md`。
+
+## 10. Add Observability / OTLP
 
 1. 确认 feature：`observability`。
 2. 需要成熟 Prometheus client 时启用 `observability-prometheus-client`。
@@ -200,7 +219,7 @@ cargo test -p rs-zero --features observability,cache-redis,rpc,resil --test obse
 cargo check -p rs-zero --no-default-features --features observability-prometheus-client
 ```
 
-## 10. Production Review
+## 11. Production Review
 
 检查：
 

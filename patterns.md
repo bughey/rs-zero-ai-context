@@ -140,6 +140,27 @@ rs-zero = { version = "0.1", features = ["rpc", "resil", "observability"] }
 - 本地 TTL 仍不是 go-zero timing wheel 模型；高 TTL churn 需要压测。
 - Redis Cluster 与应用级分片不同：Cluster 使用 Redis Cluster 协议路由，应用级分片由客户端选择节点。
 
+## Service Group Pattern
+
+```rust
+use rs_zero::{
+    core::ServiceGroup,
+    rest::{RestConfig, RestServer, RestService},
+    rpc::TonicHealthService,
+};
+
+let rest = RestService::new("api", rest_addr, RestServer::new(RestConfig::default(), router));
+let rpc = TonicHealthService::new("health-rpc", rpc_addr);
+
+let mut group = ServiceGroup::new();
+group.add(rest);
+group.add(rpc);
+group.start().await?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+规则：服务并发启动，不依赖启动顺序；worker 必须监听 `ShutdownToken`；任一服务错误默认触发全组 shutdown。
+
 ## Observability Notes
 
 - metrics label 必须低基数。
