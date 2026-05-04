@@ -32,9 +32,55 @@ cargo run -p rs-zero-cli -- -v
 
 1. 修 `.api`。
 2. 运行 `rzcli api validate -f <file>.api`。
-3. 再运行 `rzcli api gen`。
+3. 需要时运行 `rzcli api format -f <file>.api -o <formatted>.api` 预览格式化结果。
+4. 再运行 `rzcli api gen`。
 
 不要绕过 spec 手写生成文件。
+
+## `.api import` not found
+
+检查：
+
+- import 路径是否相对当前 `.api` 文件所在目录。
+- 文件名大小写是否和磁盘一致。
+- import 文件是否已提交到仓库。
+- 是否存在循环 import 或重复类型定义。
+
+处理：先修通 `rzcli api validate -f <file>.api`，再运行 `api format`、`api gen` 或 `api openapi`。不要把 import 类型复制到生成的 Rust 文件里规避解析失败。
+
+## `api format` did not overwrite the file
+
+`api format` 默认写到 `-o` 指定输出。覆盖原 `.api` 必须显式：
+
+```bash
+rzcli api format -f <file>.api -o <file>.api --force
+```
+
+覆盖前建议先输出到临时文件 review。
+
+## OpenAPI is stale
+
+症状：`openapi.json` 和当前 `.api` 或生成代码不一致。
+
+处理顺序：
+
+1. `rzcli api validate -f <file>.api`
+2. `rzcli api gen -f <file>.api -d <output-dir>`
+3. `rzcli api openapi -f <file>.api -o <openapi>.json`
+
+OpenAPI 是文档产物，不会自动更新 Rust skeleton。
+
+## goctl compatibility expectation mismatch
+
+rs-zero 追求 goctl 输入语义和工作流兼容，不生成 Go 代码，也不承诺字节级输出兼容。
+
+检查：
+
+```bash
+rzcli goctl compat matrix
+```
+
+当前 `.api` 解析覆盖常用语法，但一个解析入口文件内只验证一个 service。多 service 或非常规 goctl 边缘语法应先用 `api validate` 确认。
 
 ## RPC generation failed
 

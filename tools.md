@@ -34,6 +34,12 @@ rzcli new-rest hello-service --dir target/generated
 rzcli api validate -f examples/api-hello/hello.api
 ```
 
+格式化 `.api`：
+
+```bash
+rzcli api format -f examples/api-hello/hello.api -o examples/api-hello/hello.formatted.api
+```
+
 生成 REST skeleton：
 
 ```bash
@@ -45,6 +51,8 @@ rzcli api gen -f examples/api-hello/hello.api -d target/generated
 ```bash
 rzcli api openapi -f examples/api-hello/hello.api -o target/openapi.json
 ```
+
+OpenAPI 导出会保留 route path、request field tags、response schema，以及 `@server` 的 prefix/group 等元数据。生成前先运行 `api validate`，避免把未解析的 `.api import` 问题带入文档。
 
 ## RPC Commands
 
@@ -90,7 +98,7 @@ rzcli model gen -s schema.sql -d target/generated --sqlx-backend mysql --with-sq
 rzcli goctl compat matrix
 ```
 
-rs-zero 追求输入语义和工作流兼容，不承诺生成 Go 文件或字节级兼容 goctl。
+rs-zero 追求 goctl 输入语义和工作流兼容，不承诺生成 Go 文件或字节级兼容 goctl。当前 `.api` 兼容边界以 `goctl compat matrix` 和项目文档为准，例如一个解析入口文件内只验证一个 service。
 
 ## Cargo Verification
 

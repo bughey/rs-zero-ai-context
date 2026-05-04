@@ -7,17 +7,21 @@
 流程：
 
 1. 写 `.api` spec。
-2. 验证 spec。
-3. 使用 `rzcli` 生成。
-4. 实现业务逻辑。
-5. 添加测试和文档。
-6. 运行验证。
+2. 验证 spec，确认 import 相对路径可解析。
+3. 需要 review 时格式化 `.api`。
+4. 使用 `rzcli` 生成。
+5. 需要对外文档时导出 OpenAPI。
+6. 实现业务逻辑。
+7. 添加测试和文档。
+8. 运行验证。
 
 命令：
 
 ```bash
 rzcli api validate -f <service>.api
+rzcli api format -f <service>.api -o <service>.formatted.api
 rzcli api gen -f <service>.api -d <output_dir>
+rzcli api openapi -f <service>.api -o API.openapi.json
 cargo fmt --all -- --check
 cargo test --workspace
 ```
@@ -25,6 +29,7 @@ cargo test --workspace
 失败处理：
 
 - spec 失败：先修 `.api`，不要绕过生成器。
+- import 失败：按当前 `.api` 文件目录检查相对路径，先修 import 再生成。
 - feature 缺失：更新 `Cargo.toml` 后再编译。
 - 路由或类型不匹配：以 `.api` 为源头修正。
 
@@ -33,12 +38,20 @@ cargo test --workspace
 1. 找到现有 `.api`。
 2. 修改 spec。
 3. 运行 `rzcli api validate`。
-4. 运行 `rzcli api gen --dry-run` 预览增量计划。
-5. 运行 `rzcli api gen`。
-6. 保留已有业务逻辑，补新增 handler/logic。
-7. 更新 `API.md` 和测试。
+4. 需要时运行 `rzcli api format`，先输出到临时文件 review。
+5. 运行 `rzcli api gen --dry-run` 预览增量计划。
+6. 运行 `rzcli api gen`。
+7. 需要时重新导出 OpenAPI。
+8. 保留已有业务逻辑，补新增 handler/logic。
+9. 更新 `API.md` 和测试。
 
 不要直接只改 handler 而不更新 spec。
+
+如果本次改动涉及 `import`：
+
+- import 路径相对当前 `.api` 文件所在目录解析。
+- 先修通 `api validate`，再运行 `api format`、`api gen` 或 `api openapi`。
+- 不要复制 import 类型到生成文件里规避解析失败。
 
 如果本次新增 `@server(jwt: Auth)`：
 
@@ -107,14 +120,15 @@ rzcli model gen -s schema.sql -d <output_dir> --with-sqlx --with-redis-cache
 ## 5. API + Model Integration
 
 1. 先确认 REST `.api` 和 SQL schema。
-2. 运行 `rzcli api validate` 和 `rzcli api gen --dry-run`。
-3. 运行 `rzcli api gen` 生成或增量更新 REST skeleton。
-4. 运行 `rzcli model gen --with-sqlx` 生成 model/repository crate。
-5. 在 REST 项目 `Cargo.toml` 引入 model crate 和对应 DB feature。
-6. 建立 `AppState`，持有 `Sqlx{Entity}Repository` 或 `Cached{Entity}Repository<S>`。
-7. 在 `main.rs` 初始化 DB pool、repository、metrics，并通过 `.with_state(state)` 注入 router。
-8. handler 使用 `State<AppState>` 加生成的 request extractor，调用 repository。
-9. 补映射、handler 和 repository/cache 测试。
+2. 运行 `rzcli api validate`，必要时运行 `rzcli api format`。
+3. 运行 `rzcli api gen --dry-run`。
+4. 运行 `rzcli api gen` 生成或增量更新 REST skeleton。
+5. 运行 `rzcli model gen --with-sqlx` 生成 model/repository crate。
+6. 在 REST 项目 `Cargo.toml` 引入 model crate 和对应 DB feature。
+7. 建立 `AppState`，持有 `Sqlx{Entity}Repository` 或 `Cached{Entity}Repository<S>`。
+8. 在 `main.rs` 初始化 DB pool、repository、metrics，并通过 `.with_state(state)` 注入 router。
+9. handler 使用 `State<AppState>` 加生成的 request extractor，调用 repository。
+10. 补映射、handler 和 repository/cache 测试。
 
 参考模板：`templates/API-MODEL.md`。
 

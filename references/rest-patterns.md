@@ -18,10 +18,61 @@ REST 服务应具备：
 
 1. 写 `.api`。
 2. `rzcli api validate`。
-3. `rzcli api gen`。
-4. 补业务逻辑和测试。
-5. 补 `README.md` 与 `API.md`。
-6. 运行验证。
+3. 需要 review spec 时运行 `rzcli api format`。
+4. `rzcli api gen`。
+5. 需要接口文档时运行 `rzcli api openapi`。
+6. 补业务逻辑和测试。
+7. 补 `README.md` 与 `API.md`。
+8. 运行验证。
+
+## `.api` Imports and Formatting
+
+`.api` 可以拆分公共类型，再通过 `import` 引入：
+
+```api
+syntax = "v1"
+
+import "common/types.api"
+```
+
+规则：
+
+- import 路径相对当前 `.api` 文件所在目录解析。
+- 生成、格式化或导出 OpenAPI 前先运行 `rzcli api validate -f <file>.api`。
+- import 文件缺失、路径大小写不匹配或循环依赖时，先修 spec，不要绕过生成器手写 Rust 类型。
+- `rzcli api format -f <file>.api -o <output>.api` 用于生成格式化结果；覆盖原文件需要显式 `--force`。
+- 当前 goctl 兼容目标是输入语义和工作流兼容，不承诺字节级输出兼容；一个解析入口文件内只验证一个 service。
+
+推荐顺序：
+
+```bash
+rzcli api validate -f <service>.api
+rzcli api format -f <service>.api -o <service>.formatted.api
+rzcli api gen -f <service>.api -d <output_dir>
+```
+
+如果需要覆盖原 spec：
+
+```bash
+rzcli api format -f <service>.api -o <service>.api --force
+```
+
+## OpenAPI Export
+
+`rzcli api openapi` 用于从 `.api` 导出接口文档：
+
+```bash
+rzcli api openapi -f <service>.api -o openapi.json
+```
+
+导出内容包括：
+
+- HTTP method 与 route path。
+- request 字段 tag：`path`、`query`、`header`、`form`、`json`。
+- response schema。
+- `@server` 中可解析的 prefix、group、middleware、jwt 等元数据。
+
+OpenAPI 是文档产物，不替代 `api gen`。如果 `.api` 发生变化，先 validate，再 gen 和 openapi，保持 Rust skeleton 与文档一致。
 
 ## Handler Request Extractors
 

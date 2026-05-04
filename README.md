@@ -130,7 +130,9 @@ Review this rs-zero service for production readiness: features, timeout, breaker
 rzcli -v
 rzcli new-rest hello
 rzcli api validate -f hello.api
+rzcli api format -f hello.api -o hello.formatted.api
 rzcli api gen -f hello.api -d target/generated
+rzcli api openapi -f hello.api -o openapi.json
 rzcli rpc gen -p proto/hello.proto -d target/generated
 rzcli model gen -s schema.sql -d target/generated --with-sqlx --with-redis-cache
 cargo fmt --all -- --check
@@ -154,4 +156,3 @@ git submodule update --remote --recursive
 
 - rs-zero：Rust-first 的 go-zero 风格微服务框架。
 - rs-zero-cli：提供 `rzcli` 生成与兼容命令。
-

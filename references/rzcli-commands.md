@@ -35,7 +35,29 @@ rzcli api validate -f <file>.api
 
 用途：验证 `.api` 语法。
 
+规则：
+
+- `import` 路径按当前 `.api` 文件所在目录解析。
+- 生成或导出前先 validate，避免把未解析 import、重复类型或 handler 缺失带到后续文件。
+- 当前兼容边界以 goctl compatibility matrix 为准；不要假设所有 goctl 边缘语法都已覆盖。
+
 失败处理：修 `.api`，不要绕过 spec。
+
+## `api format`
+
+```bash
+rzcli api format -f <file>.api -o <output>.api
+rzcli api format -f <file>.api -o <file>.api --force
+```
+
+用途：稳定格式化 `.api`，让 spec review 更清晰。
+
+规则：
+
+- 格式化前先运行 `api validate`。
+- `-o` 指向新文件时适合预览格式化结果。
+- 覆盖原文件必须显式使用 `--force`。
+- 格式化只整理 `.api` 表达，不替代语义修复。
 
 ## `api gen`
 
@@ -84,6 +106,19 @@ rzcli api openapi -f <file>.api -o <file>.json
 
 用途：生成 OpenAPI JSON。
 
+导出范围：
+
+- route method 与 path。
+- request 中的 `path`、`query`、`header`、`form`、`json` 字段 tag。
+- response schema。
+- `@server` 的 prefix、group、middleware、jwt 等可解析元数据。
+
+使用建议：
+
+- 文档生成前先运行 `api validate`。
+- `.api import` 文件缺失或相对路径错误时，先修 import，再导出 OpenAPI。
+- OpenAPI 是接口文档产物，不替代 `api gen` 的 Rust skeleton。
+
 ## `rpc gen`
 
 ```bash
@@ -127,4 +162,9 @@ rzcli goctl compat matrix
 
 用途：查看 goctl 输入语义兼容范围。
 
-rs-zero 不承诺生成 Go 代码，也不承诺 goctl 输出字节级兼容。
+边界：
+
+- rs-zero 追求 goctl 输入语义和工作流兼容，不承诺生成 Go 代码。
+- 不承诺 goctl 输出字节级兼容。
+- 当前 `.api` 解析覆盖常用 `syntax`、`import`、`type`、`@server`、`service`、`@handler` 和 route 语义。
+- 一个解析入口文件内只验证一个 service；多 service 或非常规 goctl 边缘语法应先用 `api validate` 确认。
