@@ -55,6 +55,27 @@ service user-api {
 
 生成项目会读取 `JWT_AUTH_SECRET` 或 `[auth].jwt_secret`，并读取 `JWT_AUTH_EXPIRES` 或 `[auth].jwt_expires`。`jwt_expires` 单位为秒，默认 `7200`。
 
+## API + Model Pattern
+
+REST handler 调用 model repository 时，使用 `AppState` 注入 repository，不在 handler 中直接散落 SQL。
+
+```rust
+use axum::{Json, extract::State};
+use rs_zero::rest::ApiResponse;
+
+use crate::{state::AppState, types};
+
+pub async fn create_user_handler(
+    State(state): State<AppState>,
+    Json(req): Json<types::CreateUserRequest>,
+) -> ApiResponse<types::CreateUserResponse> {
+    let _ = (&state, req);
+    ApiResponse::success(types::CreateUserResponse::default())
+}
+```
+
+完整模板见 `templates/API-MODEL.md`。
+
 ## Proto Spec
 
 ```proto

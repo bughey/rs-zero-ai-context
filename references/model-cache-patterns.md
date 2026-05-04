@@ -14,6 +14,59 @@
 rzcli model gen -s schema.sql -d target/generated --with-sqlx
 ```
 
+## REST API Integration
+
+API 与 model 集成推荐保持三层：
+
+1. `.api` 定义 HTTP contract 和 DTO。
+2. SQL schema 生成 entity/repository/cache skeleton。
+3. REST handler 只做 request -> use case/repository -> response 的编排。
+
+流程：
+
+```bash
+rzcli api validate -f api/user.api
+rzcli api gen -f api/user.api -d services
+rzcli model gen -s schema/users.sql -d crates --name user-model --with-sqlx
+```
+
+REST 项目通过 `AppState` 持有 repository：
+
+```rust
+use user_model::repository::SqlxUsersRepository;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub users: SqlxUsersRepository,
+}
+```
+
+handler 使用 `State<AppState>` 和 `api gen` 自动生成的 request extractor：
+
+```rust
+use axum::{Json, extract::State};
+use rs_zero::rest::ApiResponse;
+
+use crate::{state::AppState, types};
+
+pub async fn create_user_handler(
+    State(state): State<AppState>,
+    Json(req): Json<types::CreateUserRequest>,
+) -> ApiResponse<types::CreateUserResponse> {
+    let _ = (&state, req);
+    ApiResponse::success(types::CreateUserResponse::default())
+}
+```
+
+更完整的项目模板见 `templates/API-MODEL.md`。
+
+边界：
+
+- model generator 不负责凭据、migration、transaction 边界。
+- handler 不应直接散落 SQL。
+- DTO 和 entity 不必强行共用类型；显式 mapper 更安全。
+- cache-aside repository 只缓存主键和唯一索引读取，不缓存普通多行索引结果。
+
 ## Cache-aside
 
 rs-zero cache-aside 关注：

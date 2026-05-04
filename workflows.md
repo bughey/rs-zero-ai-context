@@ -86,7 +86,28 @@ rzcli model gen -s schema.sql -d <output_dir> --with-sqlx --with-redis-cache
 - 应用级分片不是 Redis Cluster 协议。
 - 外部 Redis 测试保持 opt-in。
 
-## 5. Add Redis Cache / Cluster
+## 5. API + Model Integration
+
+1. 先确认 REST `.api` 和 SQL schema。
+2. 运行 `rzcli api validate` 和 `rzcli api gen --dry-run`。
+3. 运行 `rzcli api gen` 生成或增量更新 REST skeleton。
+4. 运行 `rzcli model gen --with-sqlx` 生成 model/repository crate。
+5. 在 REST 项目 `Cargo.toml` 引入 model crate 和对应 DB feature。
+6. 建立 `AppState`，持有 `Sqlx{Entity}Repository` 或 `Cached{Entity}Repository<S>`。
+7. 在 `main.rs` 初始化 DB pool、repository、metrics，并通过 `.with_state(state)` 注入 router。
+8. handler 使用 `State<AppState>` 加生成的 request extractor，调用 repository。
+9. 补映射、handler 和 repository/cache 测试。
+
+参考模板：`templates/API-MODEL.md`。
+
+注意：
+
+- 不把数据库凭据写入源码。
+- 不把 migration 和 transaction 边界假装交给生成器。
+- 不直接在 handler 中散落 SQL；优先通过生成的 repository。
+- 外部 DB / Redis 测试保持 opt-in。
+
+## 6. Add Redis Cache / Cluster
 
 1. 确认 feature：`cache-redis`。
 2. 选择单节点、Cluster 或应用级分片。
@@ -101,7 +122,7 @@ cargo test -p rs-zero --features cache-redis --test cache_redis_cluster
 cargo test -p rs-zero --features cache-redis,observability --test cache_redis_degradation
 ```
 
-## 6. Add Resilience
+## 7. Add Resilience
 
 1. 确认 feature：`resil`。
 2. REST 优先配置中间件；RPC 优先使用 layer/helper。
@@ -114,7 +135,7 @@ cargo test -p rs-zero --features cache-redis,observability --test cache_redis_de
 - period limiter 可按自然周期对齐。
 - adaptive shedder 在 Linux 才有真实 CPU provider，其他平台需明确降级。
 
-## 7. Add Observability / OTLP
+## 8. Add Observability / OTLP
 
 1. 确认 feature：`observability`。
 2. 需要成熟 Prometheus client 时启用 `observability-prometheus-client`。
@@ -129,7 +150,7 @@ cargo test -p rs-zero --features observability,cache-redis,rpc,resil --test obse
 cargo check -p rs-zero --no-default-features --features observability-prometheus-client
 ```
 
-## 8. Production Review
+## 9. Production Review
 
 检查：
 

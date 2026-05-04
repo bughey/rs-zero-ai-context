@@ -28,15 +28,20 @@ AI Assistant
 │  ├─ tools.md
 │  └─ patterns.md
 └─ Knowledge Layer
-   └─ references/
-      ├─ rzcli-commands.md
-      ├─ rest-patterns.md
-      ├─ rpc-patterns.md
-      ├─ model-cache-patterns.md
-      ├─ resilience-patterns.md
-      ├─ observability-patterns.md
-      ├─ production-checklist.md
-      └─ troubleshooting.md
+   ├─ references/
+   │  ├─ rzcli-commands.md
+   │  ├─ rest-patterns.md
+   │  ├─ rpc-patterns.md
+   │  ├─ model-cache-patterns.md
+   │  ├─ resilience-patterns.md
+   │  ├─ observability-patterns.md
+   │  ├─ production-checklist.md
+   │  └─ troubleshooting.md
+   └─ templates/
+      ├─ README-service.md
+      ├─ API.md
+      ├─ API-MODEL.md
+      └─ RPC.md
 ```
 
 工作流层回答“先做什么、用什么命令、怎么验证”。知识层回答“为什么这样做、具体模式是什么、生产边界在哪里”。
@@ -149,3 +154,4 @@ git submodule update --remote --recursive
 
 - rs-zero：Rust-first 的 go-zero 风格微服务框架。
 - rs-zero-cli：提供 `rzcli` 生成与兼容命令。
+
