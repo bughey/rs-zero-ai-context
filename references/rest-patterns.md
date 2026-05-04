@@ -23,6 +23,50 @@ REST 服务应具备：
 5. 补 `README.md` 与 `API.md`。
 6. 运行验证。
 
+## Handler Request Extractors
+
+`rzcli api gen` 会根据 route request 类型和字段 tag 生成 handler 入参。不要把有 request 的 handler 手写成无参。
+
+映射规则：
+
+- request 类型包含 `path` tag：生成 `axum::extract::Path<types::Req>`。
+- request 类型包含 `query` 或 `form` tag：生成 `axum::extract::Query<types::Req>`。
+- request 类型只包含 `json` tag，或没有 `path` / `query` / `form` tag：生成 `axum::Json<types::Req>`。
+- route 没有 request：handler 无入参。
+
+示例：
+
+```api
+type HelloReq {
+    Name string `path:"name"`
+}
+
+type HelloReply {
+    Message string `json:"message"`
+}
+
+service hello-api {
+    @handler HelloHandler
+    get /hello/:name (HelloReq) returns (HelloReply)
+}
+```
+
+生成签名模式：
+
+```rust
+use axum::extract::Path;
+use rs_zero::rest::ApiResponse;
+
+use crate::types;
+
+pub async fn hello_handler(Path(req): Path<types::HelloReq>) -> ApiResponse<types::HelloReply> {
+    let _ = &req;
+    ApiResponse::success(types::HelloReply::default())
+}
+```
+
+字段 tag 的 wire name 会参与 `serde(rename)`，例如 `path:"name"` 会让 `HelloReq.name` 正确绑定路径参数。
+
 ## JWT Auth
 
 `.api` 中使用 `@server(jwt: Auth)` 启用 REST JWT 生成支持：

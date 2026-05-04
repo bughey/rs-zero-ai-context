@@ -24,6 +24,25 @@ service user-api {
 - route、handler、request、response 都从 `.api` 生成。
 - 修改 API 先改 `.api`，再运行 `rzcli api validate` 和 `rzcli api gen`。
 
+Handler 入参生成示例：
+
+```api
+type HelloReq {
+    Name string `path:"name"`
+}
+
+type HelloReply {
+    Message string `json:"message"`
+}
+
+service hello-api {
+    @handler HelloHandler
+    get /hello/:name (HelloReq) returns (HelloReply)
+}
+```
+
+生成签名应包含 `Path(req): Path<types::HelloReq>`，不要改成无参 handler。`query` / `form` request 使用 `Query(req)`，默认 body request 使用 `Json(req)`。
+
 JWT 示例：
 
 ```api

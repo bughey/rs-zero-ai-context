@@ -59,6 +59,7 @@ rzcli api gen -f <file>.api -d <output-dir> --force
 - `--dry-run` 只展示 create/update/skip/conflict 计划。
 - `--overwrite-handlers` 只覆盖 handler。
 - `--force` 覆盖全部生成文件。
+- handler 入参会根据 request tag 自动生成：`path` -> `Path`，`query` / `form` -> `Query`，否则使用 `Json`；无 request 时无入参。
 
 JWT：
 
