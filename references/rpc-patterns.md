@@ -26,6 +26,73 @@ rs-zero RPC 基于 tonic。AI 生成 RPC 服务时应明确 unary 与 streaming 
 - status mapping。
 - metrics/tracing helper。
 
+## RPC + Model Integration
+
+RPC 服务调用 model repository 的推荐结构：
+
+- `.proto` 只定义 RPC contract。
+- SQL schema 生成 entity/repository/cache skeleton。
+- RPC service struct 持有 repository。
+- unary 方法通过 `RpcResilienceLayer::run_unary` 包裹业务逻辑。
+- repository 错误显式映射成 `tonic::Status`。
+
+示例：
+
+```rust
+use tonic::{Request, Response, Status};
+use user_model::repository::SqlxUsersRepository;
+
+#[derive(Clone)]
+pub struct UserService {
+    users: SqlxUsersRepository,
+}
+
+#[tonic::async_trait]
+impl user_service_server::UserService for UserService {
+    async fn get_user(
+        &self,
+        request: Request<GetUserRequest>,
+    ) -> Result<Response<GetUserReply>, Status> {
+        let req = request.into_inner();
+        let user = self.users
+            .find_by_id(req.id)
+            .await
+            .map_err(|error| Status::internal(error.to_string()))?
+            .ok_or_else(|| Status::not_found("user not found"))?;
+
+        Ok(Response::new(GetUserReply {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+        }))
+    }
+}
+```
+
+如果方法要统一接入韧性，包一层 `run_unary`：
+
+```rust
+self.resilience
+    .run_unary("GetUser", || async move { /* repository call */ })
+    .await
+```
+
+Service-level 保护可以使用 `RpcUnaryResilienceLayer`；如果方法内已经显式调用 `run_unary`，通常不要重复套层。
+
+## Error Mapping
+
+- `not found` -> `Status::not_found`。
+- `validation` -> `Status::invalid_argument`。
+- `database unavailable` -> `Status::unavailable` 或 `Status::internal`，按业务边界选择。
+- 不要把 repository 原始错误直接暴露给客户端。
+
+## Repository Boundaries
+
+- DTO/message 和 model/entity 不必共用类型。
+- 显式 mapper 更安全。
+- cache-aside 只适合主键/唯一索引读取。
+- streaming 不要长时间持有 repository 或 DB pool 句柄。
+
 ## Streaming Observation
 
 可用组合：

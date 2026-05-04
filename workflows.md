@@ -86,6 +86,24 @@ rzcli model gen -s schema.sql -d <output_dir> --with-sqlx --with-redis-cache
 - 应用级分片不是 Redis Cluster 协议。
 - 外部 Redis 测试保持 opt-in。
 
+## 4. RPC + Model Integration
+
+1. 先确认 proto 和 SQL schema。
+2. 运行 `rzcli rpc gen` 和 `rzcli model gen --with-sqlx`。
+3. 在 RPC service 中注入 `Sqlx{Entity}Repository` 或 `Cached{Entity}Repository<S>`。
+4. unary 方法使用 `RpcResilienceLayer::run_unary` 或 `RpcUnaryResilienceLayer`。
+5. 把 repository 错误映射为 `tonic::Status`。
+6. streaming 方法避免长时间持有 DB 资源，必要时使用 observed wrapper。
+7. 补映射、service 和 cache 测试。
+
+参考模板：`templates/RPC-MODEL.md`。
+
+注意：
+
+- 不把 proto message 和 model entity 强行共用。
+- 不把 repository 错误吞掉。
+- 外部 DB / Redis 测试保持 opt-in。
+
 ## 5. API + Model Integration
 
 1. 先确认 REST `.api` 和 SQL schema。
