@@ -22,6 +22,7 @@
 - Redis unavailable policy 明确。
 - Redis breaker 已开启。
 - Redis Cluster 与应用级分片选择明确。
+- Redis distributed lock 如启用，TTL、token 校验解锁、Cluster hash tag 和 Redis down 路径已验证。
 - 本地 LRU TTL 边界已说明。
 
 ## Limiter / Shedder
@@ -43,6 +44,7 @@
 
 ```bash
 scripts/external-integration.sh redis-recovery
+scripts/external-integration.sh redis-lock
 scripts/external-integration.sh redis-cluster
 scripts/external-integration.sh otlp pyroscope
 scripts/external-integration.sh linux-cpu

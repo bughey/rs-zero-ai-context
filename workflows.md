@@ -167,7 +167,25 @@ cargo test -p rs-zero --features cache-redis,observability --test cache_redis_de
 - period limiter 可按自然周期对齐。
 - adaptive shedder 在 Linux 才有真实 CPU provider，其他平台需明确降级。
 
-## 8. Add Observability / OTLP
+## 8. Add Distributed Lock
+
+1. 确认 feature：`cache-redis`。
+2. Redis lock key 必须有稳定 namespace 和 TTL。
+3. Redis Cluster lock key 使用 hash tag，例如 `order:{123}`。
+4. 临界区必须短于 TTL，不默认自动续租。
+5. 处理 `Busy`、`OwnerMismatch`、timeout、connection 和 breaker open 错误。
+6. 补单元测试；真实 Redis 使用 opt-in 验证。
+
+验证示例：
+
+```bash
+cargo test -p rs-zero --features cache-redis --test redis_lock
+scripts/external-integration.sh redis-lock
+```
+
+参考：`references/distributed-lock-patterns.md`。
+
+## 9. Add Observability / OTLP
 
 1. 确认 feature：`observability`。
 2. 需要成熟 Prometheus client 时启用 `observability-prometheus-client`。
@@ -182,12 +200,13 @@ cargo test -p rs-zero --features observability,cache-redis,rpc,resil --test obse
 cargo check -p rs-zero --no-default-features --features observability-prometheus-client
 ```
 
-## 9. Production Review
+## 10. Production Review
 
 检查：
 
 - Cargo feature 是否最小且完整。
 - timeout、breaker、limiter/shedder 是否覆盖关键入口。
+- 分布式锁如启用，TTL、owner token 解锁、Cluster hash tag 和 Redis down 路径是否验证。
 - metrics label 是否低基数。
 - Redis/DB/OTLP/Pyroscope 是否有 opt-in 验证说明。
 - profiling 是否仍标注 experimental / opt-in。

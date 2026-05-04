@@ -131,6 +131,7 @@ cargo check -p rs-zero --no-default-features --features db-mysql,db-postgres,cac
 
 ```bash
 scripts/external-integration.sh redis-recovery
+scripts/external-integration.sh redis-lock
 scripts/external-integration.sh redis-cluster
 scripts/external-integration.sh otlp pyroscope
 scripts/external-integration.sh linux-cpu
