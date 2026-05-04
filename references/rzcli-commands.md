@@ -45,6 +45,29 @@ rzcli api gen -f <file>.api -d <output-dir>
 
 用途：从 `.api` 生成 REST skeleton。
 
+增量生成参数：
+
+```bash
+rzcli api gen -f <file>.api -d <output-dir> --dry-run
+rzcli api gen -f <file>.api -d <output-dir> --overwrite-handlers
+rzcli api gen -f <file>.api -d <output-dir> --force
+```
+
+规则：
+
+- 默认安全增量：更新 `src/types.rs`、`src/router.rs`、`src/handler/mod.rs`，保留已有 handler 和项目文件。
+- `--dry-run` 只展示 create/update/skip/conflict 计划。
+- `--overwrite-handlers` 只覆盖 handler。
+- `--force` 覆盖全部生成文件。
+
+JWT：
+
+- `.api` 中的 `@server(jwt: Auth)` 会在首次生成时接入 JWT 配置。
+- secret 读取顺序：`JWT_AUTH_SECRET` -> `[auth].jwt_secret`。
+- 过期时间读取顺序：`JWT_AUTH_EXPIRES` -> `[auth].jwt_expires` -> `7200`，单位秒。
+- `jwt: AdminAuth` 对应 `JWT_ADMIN_AUTH_SECRET` 和 `JWT_ADMIN_AUTH_EXPIRES`。
+- 已有项目后新增 JWT 时，默认不会覆盖 `main.rs` 和 `etc/*.toml`；需要手动合并或使用 `--force`。
+
 完成后：
 
 1. 补业务逻辑。

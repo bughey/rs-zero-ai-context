@@ -24,6 +24,18 @@ service user-api {
 - route、handler、request、response 都从 `.api` 生成。
 - 修改 API 先改 `.api`，再运行 `rzcli api validate` 和 `rzcli api gen`。
 
+JWT 示例：
+
+```api
+@server(jwt: Auth)
+service user-api {
+    @handler profileHandler
+    get /api/profile returns (ProfileReply)
+}
+```
+
+生成项目会读取 `JWT_AUTH_SECRET` 或 `[auth].jwt_secret`，并读取 `JWT_AUTH_EXPIRES` 或 `[auth].jwt_expires`。`jwt_expires` 单位为秒，默认 `7200`。
+
 ## Proto Spec
 
 ```proto

@@ -33,11 +33,20 @@ cargo test --workspace
 1. 找到现有 `.api`。
 2. 修改 spec。
 3. 运行 `rzcli api validate`。
-4. 运行 `rzcli api gen`。
-5. 保留已有业务逻辑，补新增 handler/logic。
-6. 更新 `API.md` 和测试。
+4. 运行 `rzcli api gen --dry-run` 预览增量计划。
+5. 运行 `rzcli api gen`。
+6. 保留已有业务逻辑，补新增 handler/logic。
+7. 更新 `API.md` 和测试。
 
 不要直接只改 handler 而不更新 spec。
+
+如果本次新增 `@server(jwt: Auth)`：
+
+- 检查 `main.rs` 是否已接入 `AuthConfig`。
+- 检查 `etc/<service>.toml` 是否包含 `[auth].jwt_secret` 和 `[auth].jwt_expires`。
+- 生产环境优先使用 `JWT_AUTH_SECRET` / `JWT_AUTH_EXPIRES`。
+- `jwt_expires` 单位是秒，默认 `7200`。
+- 安全增量模式默认不会覆盖已有 `main.rs` 和 `etc/*.toml`，需要手动合并或明确使用 `--force`。
 
 ## 3. New RPC Service
 

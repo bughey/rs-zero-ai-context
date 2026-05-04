@@ -16,6 +16,7 @@
 ### 1. Spec-first
 
 - REST 从 `.api` 开始。
+- REST JWT 从 `.api` 的 `@server(jwt: Auth)` 开始，不手写绕过生成器。
 - RPC 从 `.proto` 开始。
 - model/cache 从 SQL schema 开始。
 

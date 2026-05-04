@@ -11,6 +11,9 @@
 - timeout 已配置。
 - breaker 已覆盖关键下游。
 - concurrency limit 或 shedder 已覆盖高成本入口。
+- REST JWT secret 不硬编码，优先使用环境变量或 secret manager。
+- 含 `@server(jwt: ...)` 的服务已配置 `[auth].jwt_secret` / `JWT_*_SECRET`。
+- `jwt_expires` 单位为秒，签发 token 时应使用该配置，不要散落硬编码 TTL。
 - RPC unary layer/helper 已接入。
 - streaming wrapper 的边界已记录。
 
