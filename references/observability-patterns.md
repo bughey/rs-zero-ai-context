@@ -42,6 +42,7 @@ rs-zero = { version = "0.1", features = ["observability-prometheus-client"] }
 - 使用 TraceContext 传播。
 - HTTP header 和 tonic metadata 可承载 W3C `traceparent`。
 - Redis/SQL/RPC 默认 adapter 有覆盖，手写 SQL 或未挂 layer 的 tonic stack 仍需显式接入。
+- RPC INFO logs use `rpc unary observed` with `rpc.method`, `route`, `request_id`, `traceparent`, `trace_id`, `span_id` and `code`.
 
 ## OTLP
 

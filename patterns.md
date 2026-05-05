@@ -128,6 +128,14 @@ rs-zero = { version = "0.1", features = ["rpc", "resil", "observability"] }
 - 新服务应提供 readiness/health 路径和 `/metrics`。
 - 不在 handler 中硬编码外部凭据。
 
+## RPC Log Pattern
+
+- Generated unary RPC methods use `RpcResilienceLayer::run_unary`.
+- With `observability`, unary completion emits INFO `rpc unary observed`.
+- Search by `rpc.method` / `route` such as `say_hello`.
+- For API -> RPC chains, propagate `request_id_interceptor()` and, with `otlp`, `trace_context_interceptor()`.
+- If only `h2::*` DEBUG logs appear, reduce transport noise with `RUST_LOG=info,h2=warn,hyper=warn,tower=warn`.
+
 ## RPC Resilience Notes
 
 - unary 优先使用 `RpcUnaryResilienceLayer` 或生成代码中的 `RpcResilienceLayer::run_unary`。
