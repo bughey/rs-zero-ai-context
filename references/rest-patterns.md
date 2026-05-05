@@ -190,3 +190,53 @@ REST 服务应暴露：
 - endpoint 示例。
 - 测试命令。
 - 生产边界。
+
+
+## API Context and RPC Clients
+
+当 API 调 RPC 或 model 时，优先建立 `AppState`，把长生命周期依赖放入 state。
+
+规则：
+
+- RPC client 在 `main` 中初始化一次，放入 `AppState`。
+- handler 使用 `State<AppState>` 加生成的 request extractor，例如 `Path(req)`、`Query(req)` 或 `Json(req)`。
+- router 返回 `Router<AppState>`；合并 metrics/router 后在 `main` 调 `.with_state(state)`。
+- endpoint、timeout、凭据等外部依赖配置从 `etc/<service>.toml` 或环境变量读取。
+- 不在 handler 内每次创建 `Channel` 或读取配置文件。
+- 保持 `request_id_interceptor()`，让 API 日志和 RPC 日志共享 request id。
+
+示例：
+
+```rust
+#[derive(Clone)]
+pub struct AppState {
+    pub hello_rpc: HelloRpcClient,
+}
+```
+
+```rust
+use axum::{extract::{Path, State}};
+use rs_zero::rest::ApiResponse;
+
+use crate::{state::AppState, types};
+
+pub async fn hello_handler(
+    State(state): State<AppState>,
+    Path(req): Path<types::HelloReq>,
+) -> ApiResponse<types::HelloReply> {
+    match state.hello_rpc.say_hello(req.name).await {
+        Ok(message) => ApiResponse::success(types::HelloReply { message }),
+        Err(status) => ApiResponse::fail("HELLO_RPC_UNAVAILABLE", status.to_string()),
+    }
+}
+```
+
+```rust
+use axum::{routing, Router};
+
+use crate::{handler, state::AppState};
+
+pub fn router() -> Router<AppState> {
+    Router::new().route("/hello/{name}", routing::get(handler::hello_handler))
+}
+```

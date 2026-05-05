@@ -10,6 +10,28 @@ rs-zero RPC 基于 tonic。AI 生成 RPC 服务时应明确 unary 与 streaming 
 4. 接入 resilience layer/helper。
 5. 补测试、README、RPC.md。
 
+
+## RPC Runtime Configuration
+
+`rzcli rpc gen` 生成的 RPC 项目应保留 `etc/<service>.toml`，不要把 listen address 写死在代码里。
+
+配置模式：
+
+```toml
+[server]
+name = "hello-rpc"
+host = "127.0.0.1"
+port = 50051
+```
+
+启动时使用 `rs_zero::core::load_config("etc/hello-rpc", "HELLO_RPC")`，环境变量用 `__` 覆盖嵌套字段，例如：
+
+```bash
+HELLO_RPC__SERVER__PORT=50052
+```
+
+RPC 服务实现应从配置构造 `RpcServerConfig::go_zero_defaults(app_config.server.name, app_config.server.addr())`，再传给 service。
+
 ## Unary Resilience
 
 优先选择：
@@ -112,7 +134,7 @@ If logs only show `h2::*` DEBUG frames, the service is logging transport interna
 
 For API -> RPC chains:
 
-1. Use `request_id_interceptor()` on RPC clients to propagate `x-request-id`.
+1. Keep RPC clients in API `AppState`; use `request_id_interceptor()` on RPC clients to propagate `x-request-id`.
 2. Use `trace_context_interceptor()` when `otlp` is enabled to propagate W3C TraceContext.
 3. Keep server-side unary calls inside `RpcResilienceLayer::run_unary` or `observe_rpc_unary_with_context`.
 4. Without OTLP or propagated `traceparent`, logs cannot show a real cross-service `trace_id`; correlate by `request_id` instead.

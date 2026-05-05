@@ -76,6 +76,30 @@ pub async fn create_user_handler(
 
 完整模板见 `templates/API-MODEL.md`。
 
+
+## API + RPC Pattern
+
+API handler 调 RPC 时，RPC client 必须放入 `AppState`，handler 用 `State<AppState>` 取得 client；不要在 handler 内每次 `Channel::connect`。
+
+```rust
+use axum::{extract::{Path, State}};
+use rs_zero::rest::ApiResponse;
+
+use crate::{state::AppState, types};
+
+pub async fn hello_handler(
+    State(state): State<AppState>,
+    Path(req): Path<types::HelloReq>,
+) -> ApiResponse<types::HelloReply> {
+    match state.hello_rpc.say_hello(req.name).await {
+        Ok(message) => ApiResponse::success(types::HelloReply { message }),
+        Err(status) => ApiResponse::fail("HELLO_RPC_UNAVAILABLE", status.to_string()),
+    }
+}
+```
+
+`AppState` 在 `main` 初始化一次，RPC endpoint 从 `etc/<service>.toml` 或环境变量读取。`request_id_interceptor()` 保持开启，便于 API -> RPC 日志串联。
+
 ## Proto Spec
 
 ```proto
