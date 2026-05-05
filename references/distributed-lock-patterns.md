@@ -5,7 +5,7 @@ rs-zero 的分布式锁目前以 Redis backend 为主，适合跨进程短时互
 ## Feature
 
 ```toml
-rs-zero = { version = "0.2.1", default-features = false, features = ["cache-redis"] }
+rs-zero = { version = "0.2.3", default-features = false, features = ["cache-redis"] }
 ```
 
 `cache-redis` 会启用 Redis lock 所需的 Redis client、timeout 和 breaker 能力。

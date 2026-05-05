@@ -154,10 +154,12 @@ rs-zero = { version = "0.1", features = ["rpc", "resil", "observability"] }
 
 ## RPC Log Pattern
 
-- Generated unary RPC methods use `RpcResilienceLayer::run_unary`.
+- Generated unary RPC methods expose `*_with_parts(...)` for server-side metadata-aware handling.
+- In tonic trait impls, call `RpcRequestParts::from_request(request)` before business handling; do not call `request.into_inner()` before observability/resilience.
 - With `observability`, unary completion emits INFO `rpc unary observed`.
 - Search by `rpc.method` / `route` such as `say_hello`.
 - For API -> RPC chains, propagate `request_id_interceptor()` and, with `otlp`, `trace_context_interceptor()`.
+- Server-side logs need `run_unary_with_metadata` or `observe_rpc_unary_with_metadata` to show inbound `request_id` / `traceparent`.
 - If only `h2::*` DEBUG logs appear, reduce transport noise with `RUST_LOG=info,h2=warn,hyper=warn,tower=warn`.
 
 ## RPC Resilience Notes

@@ -37,7 +37,8 @@ RPC 服务实现应从配置构造 `RpcServerConfig::go_zero_defaults(app_config
 优先选择：
 
 - `RpcUnaryResilienceLayer`：挂到 tonic/Tower unary service，降低业务漏接风险。
-- `RpcResilienceLayer::run_unary`：生成代码和手写 adapter 的兼容 helper。
+- `RpcResilienceLayer::run_unary_with_metadata`：server 侧已有 `tonic::Request<T>` 时优先使用，保留 `x-request-id` 与 `traceparent`。
+- `RpcResilienceLayer::run_unary`：无入站 metadata 或仅处理内部消息时使用。
 
 覆盖能力：
 
@@ -48,6 +49,19 @@ RPC 服务实现应从配置构造 `RpcServerConfig::go_zero_defaults(app_config
 - status mapping。
 - metrics/tracing helper。
 
+## Server-side Metadata Rule
+
+server 侧不要在观测/韧性 wrapper 之前直接 `request.into_inner()`。`x-request-id` 与 `traceparent` 在 tonic metadata 中；先丢 metadata 会导致 RPC INFO 日志里的 `request_id` / `traceparent` 为空。
+
+推荐顺序：
+
+1. 如果使用 `rzcli rpc gen` 的 skeleton，先调用 `RpcRequestParts::from_request(request)`。
+2. 委托到生成的 `*_with_parts(...)` 方法。
+3. `*_with_parts(...)` 内部使用 `RpcResilienceLayer::run_unary_with_metadata(...)`。
+4. 业务逻辑仍放在 `handle_*` 方法里。
+
+手写 tonic service 时，使用 `request.into_parts()` 保留 metadata，再调用 `run_unary_with_metadata` 或 `observe_rpc_unary_with_metadata`。
+
 ## RPC + Model Integration
 
 RPC 服务调用 model repository 的推荐结构：
@@ -55,18 +69,20 @@ RPC 服务调用 model repository 的推荐结构：
 - `.proto` 只定义 RPC contract。
 - SQL schema 生成 entity/repository/cache skeleton。
 - RPC service struct 持有 repository。
-- unary 方法通过 `RpcResilienceLayer::run_unary` 包裹业务逻辑。
+- unary 方法通过 `RpcResilienceLayer::run_unary_with_metadata` 包裹入站 tonic 请求。
 - repository 错误显式映射成 `tonic::Status`。
 
 示例：
 
 ```rust
+use rs_zero::rpc::RpcResilienceLayer;
 use tonic::{Request, Response, Status};
 use user_model::repository::SqlxUsersRepository;
 
 #[derive(Clone)]
 pub struct UserService {
     users: SqlxUsersRepository,
+    resilience: RpcResilienceLayer,
 }
 
 #[tonic::async_trait]
@@ -75,28 +91,37 @@ impl user_service_server::UserService for UserService {
         &self,
         request: Request<GetUserRequest>,
     ) -> Result<Response<GetUserReply>, Status> {
-        let req = request.into_inner();
-        let user = self.users
-            .find_by_id(req.id)
-            .await
-            .map_err(|error| Status::internal(error.to_string()))?
-            .ok_or_else(|| Status::not_found("user not found"))?;
+        let (metadata, _extensions, req) = request.into_parts();
+        let users = self.users.clone();
 
-        Ok(Response::new(GetUserReply {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-        }))
+        let reply = self.resilience
+            .run_unary_with_metadata("GetUser", &metadata, move || async move {
+                let user = users
+                    .find_by_id(req.id)
+                    .await
+                    .map_err(|error| Status::internal(error.to_string()))?
+                    .ok_or_else(|| Status::not_found("user not found"))?;
+
+                Ok(GetUserReply {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                })
+            })
+            .await?;
+
+        Ok(Response::new(reply))
     }
 }
 ```
 
-如果方法要统一接入韧性，包一层 `run_unary`：
+如果使用 `rzcli rpc gen` 生成的 service skeleton，在 tonic trait impl 中优先委托给生成的 `*_with_parts`：
 
 ```rust
-self.resilience
-    .run_unary("GetUser", || async move { /* repository call */ })
-    .await
+let reply = self
+    .get_user_with_parts(RpcRequestParts::from_request(request))
+    .await?;
+Ok(Response::new(reply))
 ```
 
 Service-level 保护可以使用 `RpcUnaryResilienceLayer`；如果方法内已经显式调用 `run_unary`，通常不要重复套层。
@@ -136,8 +161,9 @@ For API -> RPC chains:
 
 1. Keep RPC clients in API `AppState`; use `request_id_interceptor()` on RPC clients to propagate `x-request-id`.
 2. Use `trace_context_interceptor()` when `otlp` is enabled to propagate W3C TraceContext.
-3. Keep server-side unary calls inside `RpcResilienceLayer::run_unary` or `observe_rpc_unary_with_context`.
-4. Without OTLP or propagated `traceparent`, logs cannot show a real cross-service `trace_id`; correlate by `request_id` instead.
+3. On the RPC server side, preserve tonic metadata with `RpcRequestParts::from_request(request)` or `request.into_parts()` before business handling.
+4. Use `RpcResilienceLayer::run_unary_with_metadata` or `observe_rpc_unary_with_metadata` when inbound metadata is available.
+5. Without OTLP or propagated `traceparent`, logs cannot show a real cross-service `trace_id`; correlate by `request_id` instead.
 
 ## Streaming Observation
 

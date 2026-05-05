@@ -76,7 +76,7 @@ RPC 服务依赖 model crate：
 ```toml
 [dependencies]
 user-model = { path = "../../crates/user-model" }
-rs-zero = { version = "0.2.1", default-features = false, features = ["rpc", "resil", "observability", "db-sqlite"] }
+rs-zero = { version = "0.2.3", default-features = false, features = ["rpc", "resil", "observability", "db-sqlite"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
 ```
 
@@ -127,7 +127,7 @@ where
 
 ## Unary Method Pattern
 
-unary 方法优先使用 `RpcResilienceLayer::run_unary`：
+unary 方法优先使用 `RpcResilienceLayer::run_unary_with_metadata`。不要在观测/韧性 wrapper 之前直接 `request.into_inner()`，否则会丢掉 `x-request-id` 与 `traceparent`。
 
 ```rust
 use tonic::{Request, Response, Status};
@@ -142,34 +142,45 @@ impl UserService for AppService {
         &self,
         request: Request<GetUserRequest>,
     ) -> Result<Response<GetUserReply>, Status> {
+        let (metadata, _extensions, req) = request.into_parts();
         let users = self.users.clone();
 
-        self.resilience
-            .run_unary("GetUser", move || async move {
-                let req = request.into_inner();
+        let reply = self.resilience
+            .run_unary_with_metadata("GetUser", &metadata, move || async move {
                 let user = users
                     .find_by_id(req.id)
                     .await
                     .map_err(|error| Status::internal(error.to_string()))?
                     .ok_or_else(|| Status::not_found("user not found"))?;
 
-                Ok(Response::new(GetUserReply {
+                Ok(GetUserReply {
                     id: user.id,
                     email: user.email,
                     name: user.name,
-                }))
+                })
             })
-            .await
+            .await?;
+
+        Ok(Response::new(reply))
     }
 }
 ```
 
+如果使用 `rzcli rpc gen` 生成的 skeleton，优先委托给生成的 metadata-aware 方法：
+
+```rust
+let reply = self
+    .get_user_with_parts(RpcRequestParts::from_request(request))
+    .await?;
+Ok(Response::new(reply))
+```
+
 规则：
 
-- `run_unary` 负责 timeout、concurrency、breaker、shedder、metrics/tracing。 
+- `run_unary_with_metadata` 负责 timeout、concurrency、breaker、shedder、metrics/tracing，并让 RPC INFO 日志读取入站 metadata。
 - repository 错误要显式映射为 `tonic::Status`。
 - 不要吞掉错误，更不要 panic。
-- `request.into_inner()` 之后只保留必要字段，不要把请求对象跨较长 await 链乱传。
+- 只把必要字段带入业务逻辑，不要把完整 `tonic::Request` 跨较长 await 链乱传。
 
 ## Service-Level Layer
 

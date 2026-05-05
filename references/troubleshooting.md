@@ -128,3 +128,16 @@ scripts/external-integration.sh otlp pyroscope
 ## Profiling overhead
 
 profiling 是 opt-in / experimental。启用前必须压测 CPU、内存和采样开销。
+
+## RPC `request_id` is empty
+
+症状：API 日志有 `request_id`，RPC INFO 日志中 `request_id=""`。
+
+常见原因：RPC server 代码在观测前调用了 `request.into_inner()`，导致 tonic metadata 被丢弃。`x-request-id` 和 `traceparent` 都在 metadata 中，不在业务 message 中。
+
+处理：
+
+1. API client 保持 `request_id_interceptor()`，需要 trace 时同时使用 `trace_context_interceptor()`。
+2. RPC server 侧使用 `RpcRequestParts::from_request(request)` 或 `request.into_parts()` 保留 metadata。
+3. 使用 `*_with_parts(...)`、`RpcResilienceLayer::run_unary_with_metadata(...)` 或 `observe_rpc_unary_with_metadata(...)`。
+4. 确认生成项目依赖的 `rs-zero` 版本包含该能力；旧版本生成代码即使客户端带了 metadata，server 侧也可能记录为空。

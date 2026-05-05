@@ -73,7 +73,7 @@ REST 项目依赖 model crate：
 ```toml
 [dependencies]
 user-model = { path = "../../crates/user-model" }
-rs-zero = { version = "0.2.1", default-features = false, features = ["rest", "observability", "db-sqlite"] }
+rs-zero = { version = "0.2.3", default-features = false, features = ["rest", "observability", "db-sqlite"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
 ```
 

@@ -43,6 +43,7 @@ rs-zero = { version = "0.1", features = ["observability-prometheus-client"] }
 - HTTP header 和 tonic metadata 可承载 W3C `traceparent`。
 - Redis/SQL/RPC 默认 adapter 有覆盖，手写 SQL 或未挂 layer 的 tonic stack 仍需显式接入。
 - RPC INFO logs use `rpc unary observed` with `rpc.method`, `route`, `request_id`, `traceparent`, `trace_id`, `span_id` and `code`.
+- RPC server code must preserve tonic metadata before business handling. Prefer `RpcRequestParts::from_request(request)` in generated skeletons, or `request.into_parts()` plus `run_unary_with_metadata` / `observe_rpc_unary_with_metadata` in hand-written services.
 
 ## OTLP
 
