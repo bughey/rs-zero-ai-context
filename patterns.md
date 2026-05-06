@@ -79,7 +79,7 @@ pub async fn create_user_handler(
 
 ## API + RPC Pattern
 
-API handler 调 RPC 时，RPC client 必须放入 `AppState`，handler 用 `State<AppState>` 取得 client；不要在 handler 内每次 `Channel::connect`。
+API handler 调 RPC 时，RPC client 必须放入 `AppState`，handler 用 `State<AppState>` 取得 client；不要在 handler 内每次 `Channel::connect`，也不要在 handler 里手写 `HeaderMap` 到 tonic metadata 的 request id 注入。
 
 ```rust
 use axum::{extract::{Path, State}};
@@ -98,7 +98,7 @@ pub async fn hello_handler(
 }
 ```
 
-`AppState` 在 `main` 初始化一次，RPC endpoint 从 `etc/<service>.toml` 或环境变量读取。`request_id_interceptor()` 保持开启，便于 API -> RPC 日志串联。
+`AppState` 在 `main` 初始化一次，RPC endpoint 从 `etc/<service>.toml` 或环境变量读取。REST metrics middleware 会在 handler 执行期间自动设置 task-local request id；RPC client 保持 `request_id_interceptor()` 即可把当前 HTTP `x-request-id` 写入 RPC metadata。脱离 HTTP handler 的后台任务才需要显式使用 `with_rpc_request_id(...)`。
 
 ## Proto Spec
 
@@ -158,7 +158,7 @@ rs-zero = { version = "0.1", features = ["rpc", "resil", "observability"] }
 - In tonic trait impls, call `RpcRequestParts::from_request(request)` before business handling; do not call `request.into_inner()` before observability/resilience.
 - With `observability`, unary completion emits INFO `rpc unary observed`.
 - Search by `rpc.method` / `route` such as `say_hello`.
-- For API -> RPC chains, propagate `request_id_interceptor()` and, with `otlp`, `trace_context_interceptor()`.
+- For API -> RPC chains, keep `request_id_interceptor()` enabled; within REST handlers, rs-zero REST middleware automatically scopes the current `x-request-id` for the interceptor. With `otlp`, also use `trace_context_interceptor()`.
 - Server-side logs need `run_unary_with_metadata` or `observe_rpc_unary_with_metadata` to show inbound `request_id` / `traceparent`.
 - If only `h2::*` DEBUG logs appear, reduce transport noise with `RUST_LOG=info,h2=warn,hyper=warn,tower=warn`.
 

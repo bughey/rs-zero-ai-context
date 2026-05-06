@@ -160,10 +160,12 @@ If logs only show `h2::*` DEBUG frames, the service is logging transport interna
 For API -> RPC chains:
 
 1. Keep RPC clients in API `AppState`; use `request_id_interceptor()` on RPC clients to propagate `x-request-id`.
-2. Use `trace_context_interceptor()` when `otlp` is enabled to propagate W3C TraceContext.
-3. On the RPC server side, preserve tonic metadata with `RpcRequestParts::from_request(request)` or `request.into_parts()` before business handling.
-4. Use `RpcResilienceLayer::run_unary_with_metadata` or `observe_rpc_unary_with_metadata` when inbound metadata is available.
-5. Without OTLP or propagated `traceparent`, logs cannot show a real cross-service `trace_id`; correlate by `request_id` instead.
+2. In normal REST handlers, do not manually copy `HeaderMap` into tonic metadata; REST metrics middleware scopes the current request id as task-local context for `request_id_interceptor()`.
+3. Use `with_rpc_request_id(...)` only for background jobs or async boundaries outside the HTTP handler scope.
+4. Use `trace_context_interceptor()` when `otlp` is enabled to propagate W3C TraceContext.
+5. On the RPC server side, preserve tonic metadata with `RpcRequestParts::from_request(request)` or `request.into_parts()` before business handling.
+6. Use `RpcResilienceLayer::run_unary_with_metadata` or `observe_rpc_unary_with_metadata` when inbound metadata is available.
+7. Without OTLP or propagated `traceparent`, logs cannot show a real cross-service `trace_id`; correlate by `request_id` instead.
 
 ## Streaming Observation
 

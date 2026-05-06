@@ -203,7 +203,9 @@ REST 服务应暴露：
 - router 返回 `Router<AppState>`；合并 metrics/router 后在 `main` 调 `.with_state(state)`。
 - endpoint、timeout、凭据等外部依赖配置从 `etc/<service>.toml` 或环境变量读取。
 - 不在 handler 内每次创建 `Channel` 或读取配置文件。
-- 保持 `request_id_interceptor()`，让 API 日志和 RPC 日志共享 request id。
+- 不在普通 HTTP handler 中手写 `HeaderMap` -> tonic metadata 的 `x-request-id` 注入。
+- REST metrics middleware 会在 handler 执行期间自动设置 task-local request id；RPC client 保持 `request_id_interceptor()` 即可让 API 日志和 RPC 日志共享 request id。
+- 脱离 HTTP handler 的后台任务或手动异步边界，使用 `with_rpc_request_id(...)` 显式设置调用范围。
 
 示例：
 
