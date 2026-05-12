@@ -88,7 +88,7 @@ rs-zero cache-aside 关注：
 启用 feature：
 
 ```toml
-rs-zero = { version = "0.1", features = ["cache-redis", "resil", "observability"] }
+rs-zero = { version = "0.2.3", features = ["cache-redis", "resil", "observability"] }
 ```
 
 生产配置关注：

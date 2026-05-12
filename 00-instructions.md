@@ -17,7 +17,7 @@
 
 - REST 从 `.api` 开始。
 - REST JWT 从 `.api` 的 `@server(jwt: Auth)` 开始，不手写绕过生成器。
-- RPC 从 `.proto` 开始。
+- RPC 从 `.proto` 开始，server unary 默认使用 `RpcServerLayerStack`，client 默认使用 `RpcClientBuilder`。
 - model/cache 从 SQL schema 开始。
 
 ### 2. rzcli-first
@@ -83,7 +83,7 @@ cargo test --workspace
 
 ```text
 New REST? -> .api -> rzcli api validate -> rzcli api gen -> implement -> docs -> verify
-New RPC? -> .proto -> rzcli rpc gen -> implement -> docs -> verify
+New RPC? -> .proto -> rzcli rpc gen -> mount RpcServerLayerStack -> implement -> docs -> verify
 Model/cache? -> schema.sql -> rzcli model gen -> repository/cache tests -> verify
 Resilience? -> config/layer -> tests for rejection/recovery -> verify
 Observability? -> low-cardinality metrics/spans -> exporter opt-in -> verify

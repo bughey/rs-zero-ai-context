@@ -61,7 +61,9 @@ scripts/external-integration.sh linux-cpu
 
 ## RPC Resilience
 
-- unary：优先 layer/helper。
+- unary server：优先 `RpcServerLayerStack`，挂到 tonic `Server::builder().layer(...)`。
+- unary client：优先 `RpcClientBuilder`，按 `RpcClientConfig` 管理 endpoint、timeout 和后续 client-side layer。
+- 旧 helper：`RpcResilienceLayer::run_unary*` 与 `RpcUnaryResilienceLayer` 保留给手写高级场景或旧生成项目。
 - streaming：使用观察 wrapper，并说明边界。
 
 ## Verification

@@ -14,7 +14,8 @@
 - REST JWT secret 不硬编码，优先使用环境变量或 secret manager。
 - 含 `@server(jwt: ...)` 的服务已配置 `[auth].jwt_secret` / `JWT_*_SECRET`。
 - `jwt_expires` 单位为秒，签发 token 时应使用该配置，不要散落硬编码 TTL。
-- RPC unary layer/helper 已接入。
+- RPC unary server 已接入 `RpcServerLayerStack`；旧 helper 路径有明确兼容说明。
+- API 调 RPC 的 client 已放入 `AppState`，并使用 `RpcClientBuilder` / request id interceptor 传播上下文。
 - streaming wrapper 的边界已记录。
 
 ## Cache

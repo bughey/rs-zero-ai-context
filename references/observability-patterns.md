@@ -16,7 +16,7 @@
 启用：
 
 ```toml
-rs-zero = { version = "0.1", features = ["observability-prometheus-client"] }
+rs-zero = { version = "0.2.3", features = ["observability-prometheus-client"] }
 ```
 
 ## Label Rules
@@ -44,14 +44,16 @@ rs-zero = { version = "0.1", features = ["observability-prometheus-client"] }
 - REST metrics middleware 会在 handler 执行期间设置 task-local request id；API handler 内通过带 `request_id_interceptor()` 的 RPC client 调用下游时，不需要手写 `x-request-id` metadata 注入。
 - Redis/SQL/RPC 默认 adapter 有覆盖，手写 SQL 或未挂 layer 的 tonic stack 仍需显式接入。
 - RPC INFO logs use `rpc unary observed` with `rpc.method`, `route`, `request_id`, `traceparent`, `trace_id`, `span_id` and `code`.
-- RPC server code must preserve tonic metadata before business handling. Prefer `RpcRequestParts::from_request(request)` in generated skeletons, or `request.into_parts()` plus `run_unary_with_metadata` / `observe_rpc_unary_with_metadata` in hand-written services.
+- RPC server 优先挂 `RpcServerLayerStack`，由外层 Tower layer 读取 tonic metadata；trait method 内可以直接 `request.into_inner()`。
+- 只有未挂 `RpcServerLayerStack` 的手写兼容路径，才使用 `request.into_parts()` 加 `run_unary_with_metadata` / `observe_rpc_unary_with_metadata`。
+- RPC client 优先用 `RpcClientBuilder` 建立 channel，并保留 `request_id_interceptor()` 与需要时的 `trace_context_interceptor()`。
 
 ## OTLP
 
 启用：
 
 ```toml
-rs-zero = { version = "0.1", features = ["observability", "otlp"] }
+rs-zero = { version = "0.2.3", features = ["observability", "otlp"] }
 ```
 
 外部 collector 验证：
@@ -65,7 +67,7 @@ scripts/external-integration.sh otlp
 启用 profiling：
 
 ```toml
-rs-zero = { version = "0.1", features = ["profiling"] }
+rs-zero = { version = "0.2.3", features = ["profiling"] }
 ```
 
 边界：

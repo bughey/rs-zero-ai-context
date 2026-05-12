@@ -242,3 +242,20 @@ pub fn router() -> Router<AppState> {
     Router::new().route("/hello/{name}", routing::get(handler::hello_handler))
 }
 ```
+
+## Tower-first REST LayerStack
+
+`RestServer` 默认会应用 rs-zero REST middleware stack。需要显式组合 router 时，可使用 `RestLayerStack`：
+
+```rust
+use rs_zero::rest::{RestConfig, RestLayerStack};
+
+let config = RestConfig::go_zero_defaults("hello-api");
+let app = RestLayerStack::new(config).layer(router);
+```
+
+规则：
+
+- 不要为了手写 axum router 绕过 request id、metrics、timeout、breaker、shedder、auth 和统一错误映射。
+- 已有 `RestServer::new(config, router).into_router()` 仍是推荐入口。
+- 只有需要显式和其它 Tower/axum layer 编排时，才直接使用 `RestLayerStack`。

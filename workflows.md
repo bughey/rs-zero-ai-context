@@ -65,7 +65,7 @@ cargo test --workspace
 
 1. 写 `.proto`。
 2. 使用 `rzcli rpc gen` 生成 tonic skeleton。
-3. 接入 `RpcResilienceLayer` 或 `RpcUnaryResilienceLayer`。
+3. 接入 `RpcServerLayerStack`；旧项目或手写高级场景才使用 `RpcResilienceLayer` / `RpcUnaryResilienceLayer`。
 4. streaming 方法使用 observed wrapper，不冒充完整自动 stream interceptor。
 5. 生成 `README.md` / `RPC.md`。
 6. 运行验证。
@@ -104,7 +104,7 @@ rzcli model gen -s schema.sql -d <output_dir> --with-sqlx --with-redis-cache
 1. 先确认 proto 和 SQL schema。
 2. 运行 `rzcli rpc gen` 和 `rzcli model gen --with-sqlx`。
 3. 在 RPC service 中注入 `Sqlx{Entity}Repository` 或 `Cached{Entity}Repository<S>`。
-4. unary 方法使用 `RpcResilienceLayer::run_unary` 或 `RpcUnaryResilienceLayer`。
+4. unary server 外层挂 `RpcServerLayerStack`，方法内只做业务与错误映射。
 5. 把 repository 错误映射为 `tonic::Status`。
 6. streaming 方法避免长时间持有 DB 资源，必要时使用 observed wrapper。
 7. 补映射、service 和 cache 测试。
@@ -157,7 +157,7 @@ cargo test -p rs-zero --features cache-redis,observability --test cache_redis_de
 ## 7. Add Resilience
 
 1. 确认 feature：`resil`。
-2. REST 优先配置中间件；RPC 优先使用 layer/helper。
+2. REST 优先配置中间件或 `RestLayerStack`；RPC server 优先使用 `RpcServerLayerStack`，RPC client 优先使用 `RpcClientBuilder`。
 3. 需要分布式限流时启用 `cache-redis`。
 4. 为拒绝、恢复、超时和降级行为补测试。
 

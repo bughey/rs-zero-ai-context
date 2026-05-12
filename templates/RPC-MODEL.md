@@ -90,21 +90,22 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 ## Service State
 
 ```rust
-use rs_zero::rpc::{RpcResilienceConfig, RpcResilienceLayer};
+use rs_zero::rpc::{RpcServerConfig, RpcServerLayerStack};
 use user_model::repository::SqlxUsersRepository;
 
 #[derive(Clone)]
 pub struct UserService {
     users: SqlxUsersRepository,
-    resilience: RpcResilienceLayer,
+    config: RpcServerConfig,
 }
 
 impl UserService {
-    pub fn new(users: SqlxUsersRepository, config: RpcResilienceConfig) -> Self {
-        Self {
-            users,
-            resilience: RpcResilienceLayer::new("user-rpc", config),
-        }
+    pub fn new(users: SqlxUsersRepository, config: RpcServerConfig) -> Self {
+        Self { users, config }
+    }
+
+    pub fn server_layer_stack(&self) -> RpcServerLayerStack {
+        RpcServerLayerStack::new(self.config.clone())
     }
 }
 ```
@@ -113,6 +114,7 @@ impl UserService {
 
 ```rust
 use rs_zero::cache::CacheStore;
+use rs_zero::rpc::{RpcServerConfig, RpcServerLayerStack};
 use user_model::repository::CachedUsersRepository;
 
 #[derive(Clone)]
@@ -121,13 +123,13 @@ where
     S: CacheStore + Clone,
 {
     users: CachedUsersRepository<S>,
-    resilience: RpcResilienceLayer,
+    config: RpcServerConfig,
 }
 ```
 
 ## Unary Method Pattern
 
-unary 方法优先使用 `RpcResilienceLayer::run_unary_with_metadata`。不要在观测/韧性 wrapper 之前直接 `request.into_inner()`，否则会丢掉 `x-request-id` 与 `traceparent`。
+unary server 默认使用 Tower-first 路径：在 tonic server 外层挂 `RpcServerLayerStack`，method 内只处理业务 message。
 
 ```rust
 use tonic::{Request, Response, Status};
@@ -142,63 +144,58 @@ impl UserService for AppService {
         &self,
         request: Request<GetUserRequest>,
     ) -> Result<Response<GetUserReply>, Status> {
-        let (metadata, _extensions, req) = request.into_parts();
-        let users = self.users.clone();
+        let req = request.into_inner();
+        let user = self
+            .users
+            .find_by_id(req.id)
+            .await
+            .map_err(|error| Status::internal(error.to_string()))?
+            .ok_or_else(|| Status::not_found("user not found"))?;
 
-        let reply = self.resilience
-            .run_unary_with_metadata("GetUser", &metadata, move || async move {
-                let user = users
-                    .find_by_id(req.id)
-                    .await
-                    .map_err(|error| Status::internal(error.to_string()))?
-                    .ok_or_else(|| Status::not_found("user not found"))?;
-
-                Ok(GetUserReply {
-                    id: user.id,
-                    email: user.email,
-                    name: user.name,
-                })
-            })
-            .await?;
-
-        Ok(Response::new(reply))
+        Ok(Response::new(GetUserReply {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+        }))
     }
 }
 ```
 
-如果使用 `rzcli rpc gen` 生成的 skeleton，优先委托给生成的 metadata-aware 方法：
+server 启动时挂 layer：
 
 ```rust
-let reply = self
-    .get_user_with_parts(RpcRequestParts::from_request(request))
+use tonic::transport::Server;
+
+let service = AppService::new(users, rpc_config);
+let layer = service.server_layer_stack().into_layer();
+let tonic_service = user_service_server::UserServiceServer::new(service);
+
+Server::builder()
+    .layer(layer)
+    .add_service(tonic_service)
+    .serve(addr)
     .await?;
-Ok(Response::new(reply))
 ```
 
 规则：
 
-- `run_unary_with_metadata` 负责 timeout、concurrency、breaker、shedder、metrics/tracing，并让 RPC INFO 日志读取入站 metadata。
+- `RpcServerLayerStack` 负责 timeout、concurrency、breaker、shedder、metrics/tracing，并从 tonic metadata 读取 `x-request-id` 与 `traceparent`。
 - repository 错误要显式映射为 `tonic::Status`。
 - 不要吞掉错误，更不要 panic。
-- 只把必要字段带入业务逻辑，不要把完整 `tonic::Request` 跨较长 await 链乱传。
+- 默认不要在方法内再套 `run_unary`，避免和外层 `RpcServerLayerStack` 重复。
 
-## Service-Level Layer
+## Compatibility Helper Pattern
 
-如果想让整个 unary service 统一受保护，可以用 `RpcUnaryResilienceLayer`：
+只有未挂 `RpcServerLayerStack` 的旧项目或手写高级场景，才在方法内使用 metadata-aware helper：
 
 ```rust
-use tonic::transport::Server;
-use rs_zero::rpc::{RpcResilienceConfig, RpcResilienceLayer, RpcUnaryResilienceLayer};
-
-let resilience = RpcResilienceLayer::new("user-rpc", rpc_config.resilience);
-let service = AppService::new(users, rpc_config.resilience.clone());
-
-Server::builder()
-    .layer(RpcUnaryResilienceLayer::new(resilience))
-    .add_service(UserServiceServer::new(service));
+let (metadata, _extensions, req) = request.into_parts();
+let reply = self.resilience
+    .run_unary_with_metadata("GetUser", &metadata, move || async move {
+        self.handle_get_user(req).await
+    })
+    .await?;
 ```
-
-如果服务已经在方法内调用了 `run_unary`，通常不需要再重复套一层；二者二选一即可。
 
 ## Cache Wiring
 
@@ -250,6 +247,6 @@ cargo clippy --workspace --all-targets -- -D warnings
 - 凭据从环境变量、配置文件或 secret manager 读取，不写入代码。
 - migration 由应用或部署流程负责，model generator 不负责执行迁移。
 - transaction 边界由业务 use case 决定，不放进通用 repository 模板里。
-- unary 入口优先用 `RpcUnaryResilienceLayer` 或 `run_unary`，不要让业务漏接韧性。
+- unary server 优先挂 `RpcServerLayerStack`，不要让业务漏接韧性；旧 helper 只用于兼容路径。
 - SQL / RPC metrics label 保持低基数。
 - cache key 不进入 metrics label 或日志敏感字段。

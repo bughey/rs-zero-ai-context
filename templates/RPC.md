@@ -32,7 +32,8 @@ grpcurl -plaintext 127.0.0.1:{port} list
 
 ## Resilience
 
-- unary：优先说明使用 `RpcUnaryResilienceLayer` 或 `RpcResilienceLayer::run_unary`。
+- unary server：优先说明使用 `RpcServerLayerStack` 挂到 tonic `Server::builder().layer(...)`。
+- unary client：说明是否使用 `RpcClientBuilder` 和 request id / trace context interceptor。
 - 如果 unary 业务调用 model repository，说明 repository 错误如何映射为 `tonic::Status`。
 - streaming：说明使用的 observed wrapper 和边界。
 

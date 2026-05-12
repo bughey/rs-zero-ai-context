@@ -130,19 +130,19 @@ rzcli rpc gen -p proto/hello.proto -d target/generated
 
 ```toml
 [dependencies]
-rs-zero = { version = "0.1", features = ["rest", "resil", "observability"] }
+rs-zero = { version = "0.2.3", features = ["rest", "resil", "observability"] }
 ```
 
 Redis cache：
 
 ```toml
-rs-zero = { version = "0.1", features = ["cache-redis", "resil", "observability"] }
+rs-zero = { version = "0.2.3", features = ["cache-redis", "resil", "observability"] }
 ```
 
 RPC：
 
 ```toml
-rs-zero = { version = "0.1", features = ["rpc", "resil", "observability"] }
+rs-zero = { version = "0.2.3", features = ["rpc", "resil", "observability"] }
 ```
 
 ## REST Implementation Notes
@@ -152,19 +152,28 @@ rs-zero = { version = "0.1", features = ["rpc", "resil", "observability"] }
 - 新服务应提供 readiness/health 路径和 `/metrics`。
 - 不在 handler 中硬编码外部凭据。
 
+## Tower-first Layer Pattern
+
+- REST：优先使用 `RestServer` 或显式 `RestLayerStack`，不要绕过默认 timeout、metrics、breaker、shedder 和 request id scope。
+- RPC server unary：优先在 `tonic::transport::Server::builder().layer(...)` 挂载 `RpcServerLayerStack::new(config).into_layer()`。
+- RPC client：优先用 `RpcClientBuilder` 建立 channel，并配合 `request_id_interceptor()` / `trace_context_interceptor()`。
+- 通用上下文使用 `RequestContext`，负责低基数字段、`x-request-id` 和 `traceparent` 在 HTTP headers / tonic metadata / extensions 间传递。
+- 旧 helper `RpcResilienceLayer::run_unary*`、`observe_rpc_unary*`、`RpcUnaryResilienceLayer` 保留给手写高级场景或旧项目兼容，不是新生成代码的默认形态。
+
 ## RPC Log Pattern
 
-- Generated unary RPC methods expose `*_with_parts(...)` for server-side metadata-aware handling.
-- In tonic trait impls, call `RpcRequestParts::from_request(request)` before business handling; do not call `request.into_inner()` before observability/resilience.
+- `rzcli rpc gen` 生成的 unary skeleton 默认走 Tower-first：service 暴露 `server_layer_stack()`，业务方法只委托 `handle_*`。
+- tonic trait impl 可以在方法内使用 `request.into_inner()`；`x-request-id` 和 `traceparent` 已由外层 `RpcServerLayerStack` 读取。
 - With `observability`, unary completion emits INFO `rpc unary observed`.
-- Search by `rpc.method` / `route` such as `say_hello`.
+- Search by `rpc.method` / `route` such as `SayHello` or `say_hello`.
 - For API -> RPC chains, keep `request_id_interceptor()` enabled; within REST handlers, rs-zero REST middleware automatically scopes the current `x-request-id` for the interceptor. With `otlp`, also use `trace_context_interceptor()`.
-- Server-side logs need `run_unary_with_metadata` or `observe_rpc_unary_with_metadata` to show inbound `request_id` / `traceparent`.
+- 只有未挂 `RpcServerLayerStack` 的手写兼容路径，才需要 `run_unary_with_metadata` 或 `observe_rpc_unary_with_metadata` 来保留入站 metadata。
 - If only `h2::*` DEBUG logs appear, reduce transport noise with `RUST_LOG=info,h2=warn,hyper=warn,tower=warn`.
 
 ## RPC Resilience Notes
 
-- unary 优先使用 `RpcUnaryResilienceLayer` 或生成代码中的 `RpcResilienceLayer::run_unary`。
+- unary server 优先使用 `RpcServerLayerStack`。
+- unary client 优先使用 `RpcClientBuilder` + interceptor。
 - streaming 使用 `ObservedRecvStream`、`record_stream_send`、`run_observed_stream` 等组合式 wrapper。
 - 不把 streaming wrapper 描述成完整 tonic stream interceptor 替代品。
 
