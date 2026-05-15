@@ -73,7 +73,7 @@ REST 项目依赖 model crate：
 ```toml
 [dependencies]
 user-model = { path = "../../crates/user-model" }
-rs-zero = { version = "0.2.3", default-features = false, features = ["rest", "observability", "db-sqlite"] }
+rs-zero = { version = "0.2", default-features = false, features = ["rest", "resil", "observability", "db-sqlite"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite"] }
 ```
 
@@ -128,7 +128,7 @@ use anyhow::Result;
 use rs_zero::core::{LogConfig, init_tracing, shutdown_signal};
 use rs_zero::db::{DatabaseConfig, connect_sqlite_pool};
 use rs_zero::observability::{MetricsRegistry, metrics_router};
-use rs_zero::rest::{RestConfig, RestMetricsConfig, RestMiddlewareConfig, RestServer};
+use rs_zero::rest::{RestConfig, RestServer};
 use state::AppState;
 use user_model::repository::SqlxUsersRepository;
 
@@ -145,14 +145,8 @@ async fn main() -> Result<()> {
         .merge(metrics_router(metrics.clone()))
         .with_state(state);
 
-    let config = RestConfig {
-        metrics_registry: Some(metrics),
-        middlewares: RestMiddlewareConfig {
-            metrics: RestMetricsConfig { enabled: true },
-            ..RestMiddlewareConfig::default()
-        },
-        ..RestConfig::default()
-    };
+    let mut config = RestConfig::production_defaults("user-api");
+    config.metrics_registry = Some(metrics);
 
     let addr = "127.0.0.1:8080".parse()?;
     RestServer::new(config, router)

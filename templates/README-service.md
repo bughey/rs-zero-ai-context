@@ -14,7 +14,7 @@
 ## Cargo Features
 
 ```toml
-rs-zero = { version = "0.2.3", features = ["rest", "resil", "observability"] }
+rs-zero = { version = "0.2", features = ["rest", "resil", "observability"] }
 ```
 
 按实际服务修改 feature，不要保留未使用能力。

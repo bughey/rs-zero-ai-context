@@ -130,19 +130,19 @@ rzcli rpc gen -p proto/hello.proto -d target/generated
 
 ```toml
 [dependencies]
-rs-zero = { version = "0.2.3", features = ["rest", "resil", "observability"] }
+rs-zero = { version = "0.2", features = ["rest", "resil", "observability"] }
 ```
 
 Redis cache：
 
 ```toml
-rs-zero = { version = "0.2.3", features = ["cache-redis", "resil", "observability"] }
+rs-zero = { version = "0.2", features = ["cache-redis", "resil", "observability"] }
 ```
 
 RPC：
 
 ```toml
-rs-zero = { version = "0.2.3", features = ["rpc", "resil", "observability"] }
+rs-zero = { version = "0.2", features = ["rpc", "resil", "observability"] }
 ```
 
 ## REST Implementation Notes
@@ -192,7 +192,11 @@ use rs_zero::{
     rpc::TonicHealthService,
 };
 
-let rest = RestService::new("api", rest_addr, RestServer::new(RestConfig::default(), router));
+let rest = RestService::new(
+    "api",
+    rest_addr,
+    RestServer::new(RestConfig::production_defaults("api"), router),
+);
 let rpc = TonicHealthService::new("health-rpc", rpc_addr);
 
 let mut group = ServiceGroup::new();

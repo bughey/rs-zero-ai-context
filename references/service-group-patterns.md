@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
     let rest = RestService::new(
         "api",
         "127.0.0.1:8080".parse()?,
-        RestServer::new(RestConfig::default(), rest_router),
+        RestServer::new(RestConfig::production_defaults("api"), rest_router),
     );
     let rpc = TonicHealthService::new("health-rpc", "127.0.0.1:50051".parse()?);
 

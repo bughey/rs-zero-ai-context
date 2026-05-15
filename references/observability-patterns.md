@@ -16,7 +16,7 @@
 启用：
 
 ```toml
-rs-zero = { version = "0.2.3", features = ["observability-prometheus-client"] }
+rs-zero = { version = "0.2", features = ["observability-prometheus-client"] }
 ```
 
 ## Label Rules
@@ -53,7 +53,7 @@ rs-zero = { version = "0.2.3", features = ["observability-prometheus-client"] }
 启用：
 
 ```toml
-rs-zero = { version = "0.2.3", features = ["observability", "otlp"] }
+rs-zero = { version = "0.2", features = ["observability", "otlp"] }
 ```
 
 外部 collector 验证：
@@ -67,7 +67,7 @@ scripts/external-integration.sh otlp
 启用 profiling：
 
 ```toml
-rs-zero = { version = "0.2.3", features = ["profiling"] }
+rs-zero = { version = "0.2", features = ["profiling"] }
 ```
 
 边界：
