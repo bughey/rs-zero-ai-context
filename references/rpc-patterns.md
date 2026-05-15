@@ -30,7 +30,7 @@ port = 50051
 HELLO_RPC__SERVER__PORT=50052
 ```
 
-RPC 服务实现应从配置构造 `RpcServerConfig::go_zero_defaults(app_config.server.name, app_config.server.addr())`，再传给 service。
+RPC 服务实现应从配置构造 `RpcServerConfig::production_defaults(app_config.server.name, app_config.server.addr())`，再传给 service。
 
 ## Unary Resilience
 
@@ -62,7 +62,7 @@ RPC 服务实现应从配置构造 `RpcServerConfig::go_zero_defaults(app_config
 ```rust
 use rs_zero::rpc::{RpcServerConfig, RpcServerLayerStack};
 
-let config = RpcServerConfig::go_zero_defaults("hello-rpc", addr);
+let config = RpcServerConfig::production_defaults("hello-rpc", addr);
 let layer = RpcServerLayerStack::new(config.clone()).into_layer();
 let service = HelloService::new(config);
 let tonic_service = hello_service_server::HelloServiceServer::new(service);

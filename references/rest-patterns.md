@@ -250,7 +250,7 @@ pub fn router() -> Router<AppState> {
 ```rust
 use rs_zero::rest::{RestConfig, RestLayerStack};
 
-let config = RestConfig::go_zero_defaults("hello-api");
+let config = RestConfig::production_defaults("hello-api");
 let app = RestLayerStack::new(config).layer(router);
 ```
 
