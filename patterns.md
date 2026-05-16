@@ -79,10 +79,36 @@ pub async fn create_user_handler(
 
 ## API + RPC Pattern
 
-API handler 调 RPC 时，RPC client 必须放入 `AppState`，handler 用 `State<AppState>` 取得 client；不要在 handler 内每次 `Channel::connect`，也不要在 handler 里手写 `HeaderMap` 到 tonic metadata 的 request id 注入。
+API handler 调 RPC 时，`AppState` 保存长生命周期 `Channel`，并提供 `hello_rpc()` 这类方法返回已接入 `request_id_interceptor()` 的 tonic client。handler 不直接写 `Channel::connect`、`with_interceptor(...)`，也不手写 `HeaderMap` 到 tonic metadata 的 request id 注入。
+
+```rust
+use hello_rpc::proto::hello_service_client::HelloServiceClient;
+use rs_zero::rpc::{RpcClientBuilder, RpcClientConfig, request_id_interceptor};
+use tonic::{service::interceptor::InterceptedService, transport::Channel};
+
+#[derive(Clone)]
+pub struct AppState {
+    rpc_channel: Channel,
+}
+
+impl AppState {
+    pub async fn connect(endpoint: impl Into<String>) -> Result<Self, tonic::transport::Error> {
+        let config = RpcClientConfig::production_defaults(endpoint);
+        let rpc_channel = RpcClientBuilder::new(config).connect().await?;
+        Ok(Self { rpc_channel })
+    }
+
+    pub fn hello_rpc(
+        &self,
+    ) -> HelloServiceClient<InterceptedService<Channel, impl tonic::service::Interceptor>> {
+        HelloServiceClient::with_interceptor(self.rpc_channel.clone(), request_id_interceptor())
+    }
+}
+```
 
 ```rust
 use axum::{extract::{Path, State}};
+use hello_rpc::proto::SayHelloRequest;
 use rs_zero::rest::ApiResponse;
 
 use crate::{state::AppState, types};
@@ -91,14 +117,18 @@ pub async fn hello_handler(
     State(state): State<AppState>,
     Path(req): Path<types::HelloReq>,
 ) -> ApiResponse<types::HelloReply> {
-    match state.hello_rpc.say_hello(req.name).await {
-        Ok(message) => ApiResponse::success(types::HelloReply { message }),
-        Err(status) => ApiResponse::fail("HELLO_RPC_UNAVAILABLE", status.to_string()),
+    let mut client = state.hello_rpc();
+
+    match client.say_hello(SayHelloRequest { name: req.name }).await {
+        Ok(response) => ApiResponse::success(types::HelloReply {
+            message: response.into_inner().message,
+        }),
+        Err(status) => ApiResponse::fail(status.code().to_string(), status.message().to_string()),
     }
 }
 ```
 
-`AppState` 在 `main` 初始化一次，RPC endpoint 从 `etc/<service>.toml` 或环境变量读取。REST metrics middleware 会在 handler 执行期间自动设置 task-local request id；RPC client 保持 `request_id_interceptor()` 即可把当前 HTTP `x-request-id` 写入 RPC metadata。脱离 HTTP handler 的后台任务才需要显式使用 `with_rpc_request_id(...)`。
+`AppState` 在 `main` 初始化一次，RPC endpoint 从 `etc/<service>.toml` 或环境变量读取。REST metrics middleware 会在 handler 执行期间自动设置 task-local request id；`hello_rpc()` 返回的 client 保持 `request_id_interceptor()`，可把当前 HTTP `x-request-id` 写入 RPC metadata。脱离 HTTP handler 的后台任务才需要显式使用 `with_rpc_request_id(...)`。
 
 ## Proto Spec
 

@@ -210,26 +210,46 @@ REST 服务应暴露：
 
 规则：
 
-- RPC client 在 `main` 中初始化一次，放入 `AppState`。
+- RPC channel 在 `main` 中初始化一次，放入 `AppState`。
+- `AppState` 提供 `hello_rpc()` 这类方法，返回已接入 `request_id_interceptor()` 的 tonic client。
 - handler 使用 `State<AppState>` 加生成的 request extractor，例如 `Path(req)`、`Query(req)` 或 `Json(req)`。
 - router 返回 `Router<AppState>`；合并 metrics/router 后在 `main` 调 `.with_state(state)`。
 - endpoint、timeout、凭据等外部依赖配置从 `etc/<service>.toml` 或环境变量读取。
-- 不在 handler 内每次创建 `Channel` 或读取配置文件。
+- 不在 handler 内每次创建 `Channel`、读取配置文件或直接调用 `with_interceptor(...)`。
 - 不在普通 HTTP handler 中手写 `HeaderMap` -> tonic metadata 的 `x-request-id` 注入。
-- REST metrics middleware 会在 handler 执行期间自动设置 task-local request id；RPC client 保持 `request_id_interceptor()` 即可让 API 日志和 RPC 日志共享 request id。
+- REST metrics middleware 会在 handler 执行期间自动设置 task-local request id；`AppState::hello_rpc()` 创建的 client 保持 `request_id_interceptor()`，可让 API 日志和 RPC 日志共享 request id。
 - 脱离 HTTP handler 的后台任务或手动异步边界，使用 `with_rpc_request_id(...)` 显式设置调用范围。
 
 示例：
 
 ```rust
+use hello_rpc::proto::hello_service_client::HelloServiceClient;
+use rs_zero::rpc::{RpcClientBuilder, RpcClientConfig, request_id_interceptor};
+use tonic::{service::interceptor::InterceptedService, transport::Channel};
+
 #[derive(Clone)]
 pub struct AppState {
-    pub hello_rpc: HelloRpcClient,
+    rpc_channel: Channel,
+}
+
+impl AppState {
+    pub async fn connect(endpoint: impl Into<String>) -> Result<Self, tonic::transport::Error> {
+        let config = RpcClientConfig::production_defaults(endpoint);
+        let rpc_channel = RpcClientBuilder::new(config).connect().await?;
+        Ok(Self { rpc_channel })
+    }
+
+    pub fn hello_rpc(
+        &self,
+    ) -> HelloServiceClient<InterceptedService<Channel, impl tonic::service::Interceptor>> {
+        HelloServiceClient::with_interceptor(self.rpc_channel.clone(), request_id_interceptor())
+    }
 }
 ```
 
 ```rust
 use axum::{extract::{Path, State}};
+use hello_rpc::proto::SayHelloRequest;
 use rs_zero::rest::ApiResponse;
 
 use crate::{state::AppState, types};
@@ -238,9 +258,13 @@ pub async fn hello_handler(
     State(state): State<AppState>,
     Path(req): Path<types::HelloReq>,
 ) -> ApiResponse<types::HelloReply> {
-    match state.hello_rpc.say_hello(req.name).await {
-        Ok(message) => ApiResponse::success(types::HelloReply { message }),
-        Err(status) => ApiResponse::fail("HELLO_RPC_UNAVAILABLE", status.to_string()),
+    let mut client = state.hello_rpc();
+
+    match client.say_hello(SayHelloRequest { name: req.name }).await {
+        Ok(response) => ApiResponse::success(types::HelloReply {
+            message: response.into_inner().message,
+        }),
+        Err(status) => ApiResponse::fail(status.code().to_string(), status.message().to_string()),
     }
 }
 ```

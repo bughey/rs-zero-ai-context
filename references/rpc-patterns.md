@@ -196,8 +196,8 @@ If logs only show `h2::*` DEBUG frames, the service is logging transport interna
 
 For API -> RPC chains:
 
-1. Keep RPC clients in API `AppState`; use `request_id_interceptor()` on RPC clients to propagate `x-request-id`.
-2. In normal REST handlers, do not manually copy `HeaderMap` into tonic metadata; REST metrics middleware scopes the current request id as task-local context for `request_id_interceptor()`.
+1. Keep RPC channels in API `AppState`; expose `state.hello_rpc()`-style methods that create tonic clients with `request_id_interceptor()` to propagate `x-request-id`.
+2. In normal REST handlers, do not call `Channel::connect`, `with_interceptor(...)`, or manually copy `HeaderMap` into tonic metadata; REST metrics middleware scopes the current request id as task-local context for `request_id_interceptor()`.
 3. Use `with_rpc_request_id(...)` only for background jobs or async boundaries outside the HTTP handler scope.
 4. Use `trace_context_interceptor()` when `otlp` is enabled to propagate W3C TraceContext.
 5. On the RPC server side, mount `RpcServerLayerStack`; trait methods can then use `request.into_inner()` safely because metadata is handled by the outer Tower layer.
