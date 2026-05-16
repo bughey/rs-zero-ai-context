@@ -148,6 +148,8 @@ rs-zero = { version = "0.2", features = ["rpc", "resil", "observability"] }
 ## REST Implementation Notes
 
 - 使用 rs-zero REST 统一响应和错误映射。
+- 默认从 `RestConfig::production_defaults(...)` 开始。
+- 需要 Redis limiter 时，启用 `cache-redis` 并使用 `RestConfig::production_defaults_with_redis_limiter(...)`。
 - 保留 axum/tower 扩展点。
 - 新服务应提供 readiness/health 路径和 `/metrics`。
 - 不在 handler 中硬编码外部凭据。

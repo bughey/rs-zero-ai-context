@@ -169,6 +169,18 @@ jwt_expires = 7200
 
 REST 中间件应使用低基数 route/method 标识，不使用原始 URL 作为 metrics label。
 
+`RestConfig::production_defaults(...)` 不默认启用 Redis limiter；即使开启 `cache-redis` feature，Redis limiter 也必须显式配置。需要保留生产默认配置并打开 Redis limiter 时，使用 `production_defaults_with_redis_limiter(...)`：
+
+```rust
+use rs_zero::resil::RedisTokenLimiterConfig;
+use rs_zero::rest::{RestConfig, RestRateLimiterConfig};
+
+let config = RestConfig::production_defaults_with_redis_limiter(
+    "hello-api",
+    RestRateLimiterConfig::RedisToken(RedisTokenLimiterConfig::go_zero_defaults()),
+);
+```
+
 ## Observability
 
 REST 服务应暴露：

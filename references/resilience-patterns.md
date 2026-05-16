@@ -24,7 +24,7 @@ rs-zero 韧性能力集中在 `resil` feature，部分分布式限流依赖 `cac
 
 ## Token Limiter Rescue
 
-Redis token limiter 生产配置应开启本地 rescue limiter。
+Redis token limiter 生产配置应开启本地 rescue limiter。REST 服务需要 Redis token limiter 时，优先用 `RestConfig::production_defaults_with_redis_limiter(...)`，不要手动覆盖整段生产默认配置。
 
 行为：
 
