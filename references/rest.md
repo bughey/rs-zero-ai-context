@@ -78,6 +78,8 @@ OpenAPI 是文档产物，不替代 `api gen`。如果 `.api` 发生变化，先
 
 `rzcli api gen` 会生成 `handler` / `logic` 两层，并根据 route request 类型和字段 tag 生成 handler 入参。不要把有 request 的 handler 手写成无参。业务代码优先写在 `src/logic/*`，handler 只做 axum extractor 与 `ApiResponse` 适配。
 
+生成文件命名规则：handler 文件保持 `<handler>_handler.rs`；logic 文件使用 `<handler>_logic.rs`，但 re-export 的业务函数名仍与 handler 函数名一致。
+
 映射规则：
 
 - request 类型包含 `path` tag：生成 `axum::extract::Path<types::Req>`。

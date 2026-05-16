@@ -18,6 +18,7 @@ rs-zero RPC 基于 tonic。AI 生成 RPC 服务时应明确 unary 与 streaming 
 
 - `src/handler/*`：实现 tonic service trait，处理 `Request<T>` / `Response<T>` / `Status`，并调用 logic。
 - `src/logic/*`：承载业务逻辑，方法特征遵循 `.proto` 的 message 形态，例如 `SayHelloRequest -> SayHelloResponse`。
+- `src/handler/*` 文件名以 `_handler.rs` 结尾；`src/logic/*` 文件名以 `_logic.rs` 结尾。
 - `src/lib.rs`：保留 service struct、`server_layer_stack()` 和直接 message 级调用入口。
 
 示例：
@@ -35,7 +36,7 @@ pub async fn say_hello(
 handler 中只做 tonic 适配：
 
 ```rust
-let reply = logic::hello_handler::say_hello(request.into_inner()).await?;
+let reply = logic::hello_logic::say_hello(request.into_inner()).await?;
 Ok(Response::new(reply))
 ```
 
