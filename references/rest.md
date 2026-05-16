@@ -22,7 +22,7 @@ REST 服务应具备：
 4. `rzcli api gen`。
 5. 需要接口文档时运行 `rzcli api openapi`。
 6. 补业务逻辑和测试。
-7. 补 `README.md` 与 `API.md`。
+7. 补服务说明文档与 `API.md`。
 8. 运行验证。
 
 ## `.api` Imports and Formatting
@@ -207,7 +207,7 @@ REST 服务应暴露：
 
 ## Documentation
 
-`README.md` 必须说明：
+服务说明文档必须说明：
 
 - 如何运行。
 - 配置项。

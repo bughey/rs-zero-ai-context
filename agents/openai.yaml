@@ -1,0 +1,7 @@
+interface:
+  display_name: "rs-zero AI Context"
+  short_description: "生成、集成并验证 rs-zero Rust 微服务"
+  default_prompt: "使用 $rs-zero-ai-context 从规格生成并加固 rs-zero 服务，直到通过验证。"
+
+policy:
+  allow_implicit_invocation: true
