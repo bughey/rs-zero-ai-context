@@ -76,7 +76,7 @@ OpenAPI 是文档产物，不替代 `api gen`。如果 `.api` 发生变化，先
 
 ## Handler Request Extractors
 
-`rzcli api gen` 会根据 route request 类型和字段 tag 生成 handler 入参。不要把有 request 的 handler 手写成无参。
+`rzcli api gen` 会生成 `handler` / `logic` 两层，并根据 route request 类型和字段 tag 生成 handler 入参。不要把有 request 的 handler 手写成无参。业务代码优先写在 `src/logic/*`，handler 只做 axum extractor 与 `ApiResponse` 适配。
 
 映射规则：
 
@@ -108,11 +108,23 @@ service hello-api {
 use axum::extract::Path;
 use rs_zero::rest::ApiResponse;
 
+use crate::logic;
 use crate::types;
 
 pub async fn hello_handler(Path(req): Path<types::HelloReq>) -> ApiResponse<types::HelloReply> {
+    let reply = logic::hello_handler(req).await;
+    ApiResponse::success(reply)
+}
+```
+
+对应 logic：
+
+```rust
+use crate::types;
+
+pub async fn hello_handler(req: types::HelloReq) -> types::HelloReply {
     let _ = &req;
-    ApiResponse::success(types::HelloReply::default())
+    types::HelloReply::default()
 }
 ```
 
@@ -212,10 +224,10 @@ REST 服务应暴露：
 
 - RPC channel 在 `main` 中初始化一次，放入 `AppState`。
 - `AppState` 提供 `hello_rpc()` 这类方法，返回已接入 `request_id_interceptor()` 的 tonic client。
-- handler 使用 `State<AppState>` 加生成的 request extractor，例如 `Path(req)`、`Query(req)` 或 `Json(req)`。
+- handler 使用 `State<AppState>` 加生成的 request extractor，例如 `Path(req)`、`Query(req)` 或 `Json(req)`；handler 调 logic。
 - router 返回 `Router<AppState>`；合并 metrics/router 后在 `main` 调 `.with_state(state)`。
 - endpoint、timeout、凭据等外部依赖配置从 `etc/<service>.toml` 或环境变量读取。
-- 不在 handler 内每次创建 `Channel`、读取配置文件或直接调用 `with_interceptor(...)`。
+- 不在 handler 内每次创建 `Channel`、读取配置文件或直接调用 `with_interceptor(...)`；RPC 调用放在 logic。
 - 不在普通 HTTP handler 中手写 `HeaderMap` -> tonic metadata 的 `x-request-id` 注入。
 - REST metrics middleware 会在 handler 执行期间自动设置 task-local request id；`AppState::hello_rpc()` 创建的 client 保持 `request_id_interceptor()`，可让 API 日志和 RPC 日志共享 request id。
 - 脱离 HTTP handler 的后台任务或手动异步边界，使用 `with_rpc_request_id(...)` 显式设置调用范围。
@@ -249,23 +261,37 @@ impl AppState {
 
 ```rust
 use axum::{extract::{Path, State}};
-use hello_rpc::proto::SayHelloRequest;
 use rs_zero::rest::ApiResponse;
 
-use crate::{state::AppState, types};
+use crate::{logic, state::AppState, types};
 
 pub async fn hello_handler(
     State(state): State<AppState>,
     Path(req): Path<types::HelloReq>,
 ) -> ApiResponse<types::HelloReply> {
-    let mut client = state.hello_rpc();
-
-    match client.say_hello(SayHelloRequest { name: req.name }).await {
-        Ok(response) => ApiResponse::success(types::HelloReply {
-            message: response.into_inner().message,
-        }),
+    match logic::hello_handler(&state, req).await {
+        Ok(reply) => ApiResponse::success(reply),
         Err(status) => ApiResponse::fail(status.code().to_string(), status.message().to_string()),
     }
+}
+```
+
+```rust
+use hello_rpc::proto::SayHelloRequest;
+use tonic::Status;
+
+use crate::{state::AppState, types};
+
+pub async fn hello_handler(
+    state: &AppState,
+    req: types::HelloReq,
+) -> Result<types::HelloReply, Status> {
+    let mut client = state.hello_rpc();
+    let response = client.say_hello(SayHelloRequest { name: req.name }).await?;
+
+    Ok(types::HelloReply {
+        message: response.into_inner().message,
+    })
 }
 ```
 

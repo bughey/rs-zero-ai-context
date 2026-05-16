@@ -42,7 +42,7 @@ cargo test --workspace
 5. 运行 `rzcli api gen --dry-run` 预览增量计划。
 6. 运行 `rzcli api gen`。
 7. 需要时重新导出 OpenAPI。
-8. 保留已有业务逻辑，补新增 handler/logic。
+8. 保留已有业务逻辑，新增接口优先补 `src/logic/*`，handler 只做适配。
 9. 更新 `API.md` 和测试。
 
 不要直接只改 handler 而不更新 spec。
@@ -65,7 +65,8 @@ cargo test --workspace
 
 1. 写 `.proto`。
 2. 使用 `rzcli rpc gen` 生成 tonic skeleton。
-3. 接入 `RpcServerLayerStack`；旧项目或手写高级场景才使用 `RpcResilienceLayer` / `RpcUnaryResilienceLayer`。
+3. 保持 `handler` / `logic` 两层，业务写入 `src/logic/*`。
+4. 接入 `RpcServerLayerStack`；旧项目或手写高级场景才使用 `RpcResilienceLayer` / `RpcUnaryResilienceLayer`.
 4. streaming 方法使用 observed wrapper，不冒充完整自动 stream interceptor。
 5. 生成 `README.md` / `RPC.md`。
 6. 运行验证。
@@ -104,7 +105,7 @@ rzcli model gen -s schema.sql -d <output_dir> --with-sqlx --with-redis-cache
 1. 先确认 proto 和 SQL schema。
 2. 运行 `rzcli rpc gen` 和 `rzcli model gen --with-sqlx`。
 3. 在 RPC service 中注入 `Sqlx{Entity}Repository` 或 `Cached{Entity}Repository<S>`。
-4. unary server 外层挂 `RpcServerLayerStack`，方法内只做业务与错误映射。
+4. unary server 外层挂 `RpcServerLayerStack`，handler 只做 tonic 适配，logic 做业务与错误映射。
 5. 把 repository 错误映射为 `tonic::Status`。
 6. streaming 方法避免长时间持有 DB 资源，必要时使用 observed wrapper。
 7. 补映射、service 和 cache 测试。
@@ -127,8 +128,8 @@ rzcli model gen -s schema.sql -d <output_dir> --with-sqlx --with-redis-cache
 6. 在 REST 项目 `Cargo.toml` 引入 model crate 和对应 DB feature。
 7. 建立 `AppState`，持有 `Sqlx{Entity}Repository` 或 `Cached{Entity}Repository<S>`。
 8. 在 `main.rs` 初始化 DB pool、repository、metrics，并通过 `.with_state(state)` 注入 router。
-9. handler 使用 `State<AppState>` 加生成的 request extractor，调用 repository。
-10. 补映射、handler 和 repository/cache 测试。
+9. handler 使用 `State<AppState>` 加生成的 request extractor，调用 logic。
+10. logic 调用 repository/cache，并补映射、handler/logic 和 repository/cache 测试。
 
 参考模板：`templates/API-MODEL.md`。
 
@@ -136,7 +137,7 @@ rzcli model gen -s schema.sql -d <output_dir> --with-sqlx --with-redis-cache
 
 - 不把数据库凭据写入源码。
 - 不把 migration 和 transaction 边界假装交给生成器。
-- 不直接在 handler 中散落 SQL；优先通过生成的 repository。
+- 不直接在 handler 中散落 SQL；业务逻辑放在 logic，并优先通过生成的 repository。
 - 外部 DB / Redis 测试保持 opt-in。
 
 ## 6. Add Redis Cache / Cluster

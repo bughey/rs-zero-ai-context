@@ -77,11 +77,12 @@ rzcli api gen -f <file>.api -d <output-dir> --force
 
 规则：
 
-- 默认安全增量：更新 `src/types.rs`、`src/router.rs`、`src/handler/mod.rs`，保留已有 handler 和项目文件。
+- 默认安全增量：更新 `src/types.rs`、`src/router.rs`、`src/handler/mod.rs`、`src/logic/mod.rs`，保留已有 handler/logic 和项目文件。
 - `--dry-run` 只展示 create/update/skip/conflict 计划。
-- `--overwrite-handlers` 只覆盖 handler。
+- `--overwrite-handlers` 覆盖 handler 和 logic 文件。
 - `--force` 覆盖全部生成文件。
 - handler 入参会根据 request tag 自动生成：`path` -> `Path`，`query` / `form` -> `Query`，否则使用 `Json`；无 request 时无入参。
+- 生成结构为 `handler` / `logic` 两层：handler 调 logic，业务逻辑优先写在 `src/logic/*`。
 
 JWT：
 
@@ -130,7 +131,8 @@ rzcli rpc gen -p <file>.proto -d <output-dir>
 注意：
 
 - 真实 prost build wiring 可能需要应用项目补齐。
-- 生成代码默认可接入 rs-zero RPC 韧性 helper。
+- 生成结构为 `handler` / `logic` 两层：handler 负责 tonic 适配，logic 负责 proto message 级业务方法。
+- 生成代码默认暴露 `server_layer_stack()`，优先接入 `RpcServerLayerStack`。
 
 ## `model gen`
 

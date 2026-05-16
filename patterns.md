@@ -41,7 +41,7 @@ service hello-api {
 }
 ```
 
-生成签名应包含 `Path(req): Path<types::HelloReq>`，不要改成无参 handler。`query` / `form` request 使用 `Query(req)`，默认 body request 使用 `Json(req)`。
+生成的 REST 项目采用 `handler` / `logic` 两层：`handler` 保留 axum extractor 和 `ApiResponse` 适配，`logic` 方法名与 handler 对齐，入参/出参遵循 `.api` 的 `Request -> Response`。生成签名应包含 `Path(req): Path<types::HelloReq>`，不要改成无参 handler。`query` / `form` request 使用 `Query(req)`，默认 body request 使用 `Json(req)`。业务代码优先写在 `src/logic/*`。
 
 JWT 示例：
 
@@ -57,7 +57,7 @@ service user-api {
 
 ## API + Model Pattern
 
-REST handler 调用 model repository 时，使用 `AppState` 注入 repository，不在 handler 中直接散落 SQL。
+REST logic 调用 model repository 时，使用 `AppState` 注入 repository，不在 handler 中直接散落 SQL。handler 只做 HTTP 入参/响应适配。
 
 ```rust
 use axum::{Json, extract::State};
@@ -69,8 +69,10 @@ pub async fn create_user_handler(
     State(state): State<AppState>,
     Json(req): Json<types::CreateUserRequest>,
 ) -> ApiResponse<types::CreateUserResponse> {
-    let _ = (&state, req);
-    ApiResponse::success(types::CreateUserResponse::default())
+    match logic::create_user_handler(&state, req).await {
+        Ok(reply) => ApiResponse::success(reply),
+        Err(error) => ApiResponse::fail("MODEL_ERROR", error.to_string()),
+    }
 }
 ```
 
@@ -79,7 +81,7 @@ pub async fn create_user_handler(
 
 ## API + RPC Pattern
 
-API handler 调 RPC 时，`AppState` 保存长生命周期 `Channel`，并提供 `hello_rpc()` 这类方法返回已接入 `request_id_interceptor()` 的 tonic client。handler 不直接写 `Channel::connect`、`with_interceptor(...)`，也不手写 `HeaderMap` 到 tonic metadata 的 request id 注入。
+API 调 RPC 时，`AppState` 保存长生命周期 `Channel`，并提供 `hello_rpc()` 这类方法返回已接入 `request_id_interceptor()` 的 tonic client。handler 不直接写 `Channel::connect`、`with_interceptor(...)`，也不手写 `HeaderMap` 到 tonic metadata 的 request id 注入。RPC 调用和业务映射放在 logic 层。
 
 ```rust
 use hello_rpc::proto::hello_service_client::HelloServiceClient;
@@ -108,27 +110,22 @@ impl AppState {
 
 ```rust
 use axum::{extract::{Path, State}};
-use hello_rpc::proto::SayHelloRequest;
 use rs_zero::rest::ApiResponse;
 
-use crate::{state::AppState, types};
+use crate::{logic, state::AppState, types};
 
 pub async fn hello_handler(
     State(state): State<AppState>,
     Path(req): Path<types::HelloReq>,
 ) -> ApiResponse<types::HelloReply> {
-    let mut client = state.hello_rpc();
-
-    match client.say_hello(SayHelloRequest { name: req.name }).await {
-        Ok(response) => ApiResponse::success(types::HelloReply {
-            message: response.into_inner().message,
-        }),
+    match logic::hello_handler(&state, req).await {
+        Ok(reply) => ApiResponse::success(reply),
         Err(status) => ApiResponse::fail(status.code().to_string(), status.message().to_string()),
     }
 }
 ```
 
-`AppState` 在 `main` 初始化一次，RPC endpoint 从 `etc/<service>.toml` 或环境变量读取。REST metrics middleware 会在 handler 执行期间自动设置 task-local request id；`hello_rpc()` 返回的 client 保持 `request_id_interceptor()`，可把当前 HTTP `x-request-id` 写入 RPC metadata。脱离 HTTP handler 的后台任务才需要显式使用 `with_rpc_request_id(...)`。
+`AppState` 在 `main` 初始化一次，RPC endpoint 从 `etc/<service>.toml` 或环境变量读取。REST metrics middleware 会在 handler/logic 执行期间自动设置 task-local request id；logic 内通过 `hello_rpc()` 获取的 client 保持 `request_id_interceptor()`，可把当前 HTTP `x-request-id` 写入 RPC metadata。脱离 HTTP handler 的后台任务才需要显式使用 `with_rpc_request_id(...)`。
 
 ## Proto Spec
 
@@ -194,7 +191,7 @@ rs-zero = { version = "0.2", features = ["rpc", "resil", "observability"] }
 
 ## RPC Log Pattern
 
-- `rzcli rpc gen` 生成的 unary skeleton 默认走 Tower-first：service 暴露 `server_layer_stack()`，业务方法只委托 `handle_*`。
+- `rzcli rpc gen` 生成的 unary skeleton 默认走 Tower-first：service 暴露 `server_layer_stack()`，tonic handler 委托 `src/logic/*`，业务代码写在 logic。
 - tonic trait impl 可以在方法内使用 `request.into_inner()`；`x-request-id` 和 `traceparent` 已由外层 `RpcServerLayerStack` 读取。
 - With `observability`, unary completion emits INFO `rpc unary observed`.
 - Search by `rpc.method` / `route` such as `SayHello` or `say_hello`.
