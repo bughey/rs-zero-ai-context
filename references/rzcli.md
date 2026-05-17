@@ -91,7 +91,7 @@ JWT：
 - 过期时间读取顺序：`JWT_AUTH_EXPIRES` -> `[auth].jwt_expires` -> `7200`，单位秒。
 - 环境变量固定为 `JWT_AUTH_SECRET` 和 `JWT_AUTH_EXPIRES`；`jwt: AdminAuth` 保留为认证域名，不再改变环境变量名。
 - 已有项目后新增 JWT 时，默认不会覆盖 `main.rs` 和 `etc/*.toml`；需要手动合并或使用 `--force`。
-- 新生成 REST 入口默认使用 `RestServiceConfig::load("etc/<service>", "<ENV_PREFIX>")`，不再生成自定义 `AppConfig`。
+- 新生成 REST 入口默认使用 `RestServiceConfig::load("etc/<service>", "<ENV_PREFIX>")`，不再生成自定义 `AppConfig`，并调用 `emit_config_warnings(&app.validate_features())`。
 - `etc/<service>.toml` 包含顶层 `name` / `mode`、`[server]`、`[log]`、`[middlewares]`，JWT 项目额外包含 `[auth]`。
 
 完成后：
@@ -134,7 +134,7 @@ rzcli rpc gen -p <file>.proto -d <output-dir>
 
 - 真实 prost build wiring 可能需要应用项目补齐。
 - 生成结构为 `handler` / `logic` 两层：handler 负责 tonic 适配，logic 负责 proto message 级业务方法。
-- 生成入口默认使用 `RpcServiceConfig::load("etc/<service>", "<ENV_PREFIX>")`，不再生成自定义 `src/config.rs`。
+- 生成入口默认使用 `RpcServiceConfig::load("etc/<service>", "<ENV_PREFIX>")`，不再生成自定义 `src/config.rs`，并调用 `emit_config_warnings(&app.validate_features())`。
 - `etc/<service>.toml` 包含顶层 `name` / `mode`、`[server]`、`[log]`、`[middlewares]`。
 - 生成代码默认暴露 `server_layer_stack()`，优先接入 `RpcServerLayerStack`。
 

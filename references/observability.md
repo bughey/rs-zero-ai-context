@@ -76,6 +76,7 @@ max_size_mb = 128
 - `compress = true` 将轮转文件压缩为 `.gz`。
 - `keep_days` 和 `max_backups` 分别控制时间与数量清理；`0` 表示不启用对应清理。
 - `RUST_LOG` 优先覆盖 `[log].level`。
+- `emit_config_warnings(&app.validate_features())` 会提示配置已开启但当前 build 缺失的 feature，例如 `metrics = true` 但未启用 `observability`。
 
 ## OTLP
 

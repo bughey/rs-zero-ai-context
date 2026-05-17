@@ -80,12 +80,13 @@ OpenAPI 是文档产物，不替代 `api gen`。如果 `.api` 发生变化，先
 `rzcli new-rest` 和 `rzcli api gen` 生成的入口默认使用框架级 `RestServiceConfig`，不要再为 REST/日志/JWT 生成自定义 `AppConfig`：
 
 ```rust
-use rs_zero::core::{RestServiceConfig, init_tracing, shutdown_signal};
+use rs_zero::core::{RestServiceConfig, emit_config_warnings, init_tracing, shutdown_signal};
 use rs_zero::observability::{MetricsRegistry, metrics_router};
 use rs_zero::rest::RestServer;
 
 let app = RestServiceConfig::load("etc/hello-api", "HELLO_API")?;
 let _ = init_tracing(app.log_config());
+emit_config_warnings(&app.validate_features());
 
 let metrics = MetricsRegistry::new();
 let router = router::router().merge(metrics_router(metrics.clone()));
@@ -124,7 +125,7 @@ metrics = true
 resilience = true
 ```
 
-环境变量按 `__` 覆盖嵌套字段，例如 `HELLO_API__SERVER__PORT=8081`。`RUST_LOG` 仍优先覆盖 `[log].level`。
+环境变量按 `__` 覆盖嵌套字段，例如 `HELLO_API__SERVER__PORT=8081`。`RUST_LOG` 仍优先覆盖 `[log].level`。启动后调用 `emit_config_warnings(&app.validate_features())`，当 `[middlewares]` 请求的能力缺少 Cargo feature 时只打印 warning，不中断服务。
 
 ## Handler Request Extractors
 

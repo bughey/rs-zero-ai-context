@@ -75,14 +75,15 @@ streaming = true
 启动时使用：
 
 ```rust
-use rs_zero::core::{RpcServiceConfig, init_tracing, shutdown_signal};
+use rs_zero::core::{RpcServiceConfig, emit_config_warnings, init_tracing, shutdown_signal};
 
 let app = RpcServiceConfig::load("etc/hello-rpc", "HELLO_RPC")?;
 let _ = init_tracing(app.log_config());
+emit_config_warnings(&app.validate_features());
 let server_config = app.rpc_server_config()?;
 ```
 
-环境变量用 `__` 覆盖嵌套字段，例如 `HELLO_RPC__SERVER__PORT=50052`。RPC 服务实现应接收 `app.rpc_server_config()?` 后再构造 service。
+环境变量用 `__` 覆盖嵌套字段，例如 `HELLO_RPC__SERVER__PORT=50052`。启动后调用 `emit_config_warnings(&app.validate_features())`，当 `[middlewares]` 请求的能力缺少 Cargo feature 时只打印 warning。RPC 服务实现应接收 `app.rpc_server_config()?` 后再构造 service。
 
 ## Unary Resilience
 
