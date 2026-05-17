@@ -92,7 +92,7 @@ JWT：
 - 环境变量固定为 `JWT_AUTH_SECRET` 和 `JWT_AUTH_EXPIRES`；`jwt: AdminAuth` 保留为认证域名，不再改变环境变量名。
 - 已有项目后新增 JWT 时，默认不会覆盖 `main.rs` 和 `etc/*.toml`；需要手动合并或使用 `--force`。
 - 新生成 REST 入口默认使用 `RestServiceConfig::load("etc/<service>", "<ENV_PREFIX>")`，不再生成自定义 `AppConfig`，并调用 `emit_config_warnings(&app.validate_features())`。
-- `etc/<service>.toml` 包含顶层 `name` / `mode`、`[server]`、`[log]`、`[middlewares]`，JWT 项目额外包含 `[auth]`。
+- `etc/<service>.toml` 包含顶层 `name` / `mode`、`[server]`、`[log]`、`[middlewares]`，JWT 项目额外包含 `[auth]`；RPC endpoint、etcd discovery 和 model database 使用框架 `[rpc_clients.<name>]` / `[database]`。
 
 完成后：
 
@@ -135,7 +135,7 @@ rzcli rpc gen -p <file>.proto -d <output-dir>
 - 真实 prost build wiring 可能需要应用项目补齐。
 - 生成结构为 `handler` / `logic` 两层：handler 负责 tonic 适配，logic 负责 proto message 级业务方法。
 - 生成入口默认使用 `RpcServiceConfig::load("etc/<service>", "<ENV_PREFIX>")`，不再生成自定义 `src/config.rs`，并调用 `emit_config_warnings(&app.validate_features())`。
-- `etc/<service>.toml` 包含顶层 `name` / `mode`、`[server]`、`[log]`、`[middlewares]`。
+- `etc/<service>.toml` 包含顶层 `name` / `mode`、`[server]`、`[log]`、`[middlewares]`；服务调用其他 RPC 时使用 `[rpc_clients.<name>]`，model repository 数据库使用 `[database]`。
 - 生成代码默认暴露 `server_layer_stack()`，优先接入 `RpcServerLayerStack`。
 
 ## `model gen`
@@ -159,6 +159,7 @@ rzcli model gen -s <schema.sql> -d <output-dir>
 
 - 默认测试不连接真实 DB。
 - 需要 Redis cache 时启用 `cache-redis` feature。
+- 消费服务应把数据库配置放到 `etc/<service>.toml` 的 `[database]`，通过 `RestServiceConfig::database_config()` 或 `RpcServiceConfig::database_config()` 创建连接池后注入 repository。
 
 ## `goctl compat matrix`
 

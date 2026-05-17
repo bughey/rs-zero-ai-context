@@ -127,6 +127,72 @@ resilience = true
 
 环境变量按 `__` 覆盖嵌套字段，例如 `HELLO_API__SERVER__PORT=8081`。`RUST_LOG` 仍优先覆盖 `[log].level`。启动后调用 `emit_config_warnings(&app.validate_features())`，当 `[middlewares]` 请求的能力缺少 Cargo feature 时只打印 warning，不中断服务。
 
+## Framework Dependencies
+
+API 调 RPC、连接 model 数据库等依赖应放在框架配置里，而不是业务自定义配置。
+
+静态 RPC endpoint：
+
+```toml
+[rpc_clients.hello]
+provider = "static"
+endpoint = "http://127.0.0.1:50051"
+service = "hello-rpc"
+connect_timeout_ms = 3000
+request_timeout_ms = 5000
+
+[rpc_clients.hello.retry]
+enabled = true
+max_attempts = 3
+initial_backoff_ms = 50
+max_backoff_ms = 500
+
+[rpc_clients.hello.deadline]
+propagate = true
+clip_retries_to_budget = true
+
+[rpc_clients.hello.load_balance]
+policy = "static"
+```
+
+etcd 服务发现：
+
+```toml
+[rpc_clients.hello]
+provider = "etcd"
+service = "hello-rpc"
+
+[rpc_clients.hello.etcd]
+endpoints = ["http://127.0.0.1:2379"]
+prefix = "/rs-zero"
+connect_timeout_ms = 3000
+operation_timeout_ms = 3000
+```
+
+数据库：
+
+```toml
+[database]
+kind = "postgres" # sqlite | postgres | mysql
+url = "postgres://user:pass@127.0.0.1/app"
+max_connections = 20
+connect_timeout_ms = 5000
+```
+
+代码中从 `RestServiceConfig` 转换：
+
+```rust
+let rpc = app.rpc_client_config("hello")?;
+let db = app.database_config();
+```
+
+feature 规则：
+
+- `[rpc_clients]` 需要 `rpc` feature。
+- `provider = "etcd"` 需要 `discovery-etcd` feature。
+- `[database].kind` 需要匹配 `db-sqlite`、`db-postgres` 或 `db-mysql`。
+- `emit_config_warnings(&app.validate_features())` 只打印 warning；真实连接失败仍应作为启动错误处理。
+
 ## Handler Request Extractors
 
 `rzcli api gen` 会生成 `handler` / `logic` 两层，并根据 route request 类型和字段 tag 生成 handler 入参。不要把有 request 的 handler 手写成无参。业务代码优先写在 `src/logic/*`，handler 只做 axum extractor 与 `ApiResponse` 适配。

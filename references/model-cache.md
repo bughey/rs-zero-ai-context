@@ -18,10 +18,43 @@ rzcli model gen -s schema.sql -d target/generated --with-sqlx --with-redis-cache
 
 边界：
 
-- 生成器不负责凭据、migration、transaction 边界或连接池所有权。
+- 生成器不负责 migration 或 transaction 边界。
+- 数据库 URL、连接池大小和 timeout 放到服务的 `[database]` 框架配置。
 - 生成 repository 是持久化 adapter，不承载业务逻辑。
 - DTO 与数据库 entity 应显式转换。
 - cache-aside repository 应优先缓存主键和唯一索引读取；普通多行查询除非有明确失效策略，否则不要缓存。
+
+## Framework Database Configuration
+
+model 数据库访问的运行时配置由消费服务持有，不写进 model crate。
+
+REST/RPC 服务配置：
+
+```toml
+[database]
+kind = "postgres" # sqlite | postgres | mysql
+url = "postgres://user:pass@127.0.0.1/app"
+max_connections = 20
+connect_timeout_ms = 5000
+```
+
+feature 对应关系：
+
+- `kind = "sqlite"` -> `db-sqlite`
+- `kind = "postgres"` -> `db-postgres`
+- `kind = "mysql"` -> `db-mysql`
+
+代码模式：
+
+```rust
+let db = app
+    .database_config()
+    .ok_or_else(|| anyhow::anyhow!("missing [database] config"))?;
+let pool = rs_zero::db::connect_pool(&db).await?;
+let users = user_model::repository::SqlxUsersRepository::new(pool.clone());
+```
+
+`emit_config_warnings(&app.validate_features())` 会在 `[database].kind` 与 Cargo feature 不匹配时打印 warning。启动阶段创建 pool 失败应直接返回错误，不要静默降级。
 
 ## REST API + model 集成
 
@@ -51,6 +84,8 @@ pub struct AppState {
     pub users: SqlxUsersRepository,
 }
 ```
+
+初始化 state 时从 `RestServiceConfig::database_config()` 创建 pool 和 repository；handler/logic 不读取数据库 URL。
 
 Handler 保持薄层：
 

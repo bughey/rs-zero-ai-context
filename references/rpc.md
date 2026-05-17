@@ -85,6 +85,56 @@ let server_config = app.rpc_server_config()?;
 
 环境变量用 `__` 覆盖嵌套字段，例如 `HELLO_RPC__SERVER__PORT=50052`。启动后调用 `emit_config_warnings(&app.validate_features())`，当 `[middlewares]` 请求的能力缺少 Cargo feature 时只打印 warning。RPC 服务实现应接收 `app.rpc_server_config()?` 后再构造 service。
 
+## Outbound RPC Clients and Discovery
+
+RPC endpoint 属于框架依赖配置。API 服务或 RPC 服务需要调用其他 RPC 时，在同一个 `etc/<service>.toml` 中配置 `[rpc_clients.<name>]`，再从 `RestServiceConfig` 或 `RpcServiceConfig` 转换。
+
+静态 endpoint：
+
+```toml
+[rpc_clients.user]
+provider = "static"
+endpoint = "http://127.0.0.1:50051"
+service = "user-rpc"
+connect_timeout_ms = 3000
+request_timeout_ms = 5000
+```
+
+etcd discovery：
+
+```toml
+[rpc_clients.user]
+provider = "etcd"
+service = "user-rpc"
+
+[rpc_clients.user.load_balance]
+policy = "weighted_round_robin"
+
+[rpc_clients.user.etcd]
+endpoints = ["http://127.0.0.1:2379"]
+prefix = "/rs-zero"
+lease_ttl = 30
+reconnect_interval_ms = 1000
+connect_timeout_ms = 3000
+operation_timeout_ms = 3000
+keep_alive_interval_ms = 5000
+keep_alive_timeout_ms = 3000
+
+[rpc_clients.user.etcd.watch_backoff]
+initial_ms = 200
+max_ms = 5000
+```
+
+使用：
+
+```rust
+let client_config = app.rpc_client_config("user")?;
+let builder = rs_zero::rpc::RpcClientBuilder::new(client_config);
+let channel = builder.connect().await?;
+```
+
+如果启用 etcd，需要 `discovery-etcd` feature；缺少 feature 时 `validate_features()` 打 warning。连接 discovery、选择实例和构造 tonic client 应封装到 `AppState`，logic 不直接处理 endpoint、metadata 或 interceptor。
+
 ## Unary Resilience
 
 优先选择 Tower-first 路径：
@@ -249,7 +299,7 @@ If logs only show `h2::*` DEBUG frames, the service is logging transport interna
 
 For API -> RPC chains:
 
-1. Keep RPC channels in API `AppState`; expose `state.hello_rpc()`-style methods that create tonic clients with `request_id_interceptor()` to propagate `x-request-id`.
+1. Keep RPC channels in API `AppState`; read endpoint/discovery from `[rpc_clients.<name>]` with `RestServiceConfig::rpc_client_config("<name>")`, then expose `state.hello_rpc()`-style methods that create tonic clients with `request_id_interceptor()` to propagate `x-request-id`.
 2. In normal REST handlers, do not call `Channel::connect`, `with_interceptor(...)`, or manually copy `HeaderMap` into tonic metadata; REST metrics middleware scopes the current request id as task-local context for `request_id_interceptor()`.
 3. Use `with_rpc_request_id(...)` only for background jobs or async boundaries outside the HTTP handler scope.
 4. Use `trace_context_interceptor()` when `otlp` is enabled to propagate W3C TraceContext.
