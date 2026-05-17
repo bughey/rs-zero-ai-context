@@ -48,6 +48,35 @@ rs-zero = { version = "0.2", features = ["observability-prometheus-client"] }
 - 只有未挂 `RpcServerLayerStack` 的手写兼容路径，才使用 `request.into_parts()` 加 `run_unary_with_metadata` / `observe_rpc_unary_with_metadata`。
 - RPC client 优先用 `RpcClientBuilder` 建立 channel，并保留 `request_id_interceptor()` 与需要时的 `trace_context_interceptor()`。
 
+
+## File Logging
+
+生成服务的 `[log]` 由 `RestServiceConfig` / `RpcServiceConfig` 映射为 `LogConfig`：
+
+```toml
+[log]
+mode = "file" # console | file | volume
+encoding = "json"
+level = "info"
+path = "logs"
+rotation = "size" # daily | size
+compress = true
+keep_days = 7
+max_backups = 5
+max_size_mb = 128
+```
+
+规则：
+
+- `mode = "console"` 写 stdout。
+- `mode = "file"` 写 `logs/<service>.log`。
+- `mode = "volume"` 写 `logs/<hostname>-<service>.log`。
+- `rotation = "size"` 按 `max_size_mb` 轮转；`0` 使用框架默认大小。
+- `rotation = "daily"` 按本地日期变化轮转。
+- `compress = true` 将轮转文件压缩为 `.gz`。
+- `keep_days` 和 `max_backups` 分别控制时间与数量清理；`0` 表示不启用对应清理。
+- `RUST_LOG` 优先覆盖 `[log].level`。
+
 ## OTLP
 
 启用：

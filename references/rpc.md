@@ -42,24 +42,47 @@ Ok(Response::new(reply))
 
 ## RPC Runtime Configuration
 
-`rzcli rpc gen` 生成的 RPC 项目应保留 `etc/<service>.toml`，不要把 listen address 写死在代码里。
+`rzcli rpc gen` 生成的 RPC 项目应保留 `etc/<service>.toml`，不要把 listen address 写死在代码里。入口默认使用框架级 `RpcServiceConfig`，不再生成自定义 `src/config.rs`。
 
 配置模式：
 
 ```toml
-[server]
 name = "hello-rpc"
+mode = "pro"
+
+[server]
 host = "127.0.0.1"
 port = 50051
+timeout_ms = 5000
+health = true
+
+[log]
+mode = "console"
+encoding = "plain"
+level = "info"
+path = "logs"
+rotation = "daily"
+compress = false
+keep_days = 0
+max_backups = 0
+max_size_mb = 0
+
+[middlewares]
+resilience = true
+streaming = true
 ```
 
-启动时使用 `rs_zero::core::load_config("etc/hello-rpc", "HELLO_RPC")`，环境变量用 `__` 覆盖嵌套字段，例如：
+启动时使用：
 
-```bash
-HELLO_RPC__SERVER__PORT=50052
+```rust
+use rs_zero::core::{RpcServiceConfig, init_tracing, shutdown_signal};
+
+let app = RpcServiceConfig::load("etc/hello-rpc", "HELLO_RPC")?;
+let _ = init_tracing(app.log_config());
+let server_config = app.rpc_server_config()?;
 ```
 
-RPC 服务实现应从配置构造 `RpcServerConfig::production_defaults(app_config.server.name, app_config.server.addr())`，再传给 service。
+环境变量用 `__` 覆盖嵌套字段，例如 `HELLO_RPC__SERVER__PORT=50052`。RPC 服务实现应接收 `app.rpc_server_config()?` 后再构造 service。
 
 ## Unary Resilience
 

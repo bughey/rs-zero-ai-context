@@ -74,6 +74,58 @@ rzcli api openapi -f <service>.api -o openapi.json
 
 OpenAPI 是文档产物，不替代 `api gen`。如果 `.api` 发生变化，先 validate，再 gen 和 openapi，保持 Rust skeleton 与文档一致。
 
+
+## Framework Service Configuration
+
+`rzcli new-rest` 和 `rzcli api gen` 生成的入口默认使用框架级 `RestServiceConfig`，不要再为 REST/日志/JWT 生成自定义 `AppConfig`：
+
+```rust
+use rs_zero::core::{RestServiceConfig, init_tracing, shutdown_signal};
+use rs_zero::observability::{MetricsRegistry, metrics_router};
+use rs_zero::rest::RestServer;
+
+let app = RestServiceConfig::load("etc/hello-api", "HELLO_API")?;
+let _ = init_tracing(app.log_config());
+
+let metrics = MetricsRegistry::new();
+let router = router::router().merge(metrics_router(metrics.clone()));
+let mut config = app.rest_config();
+config.metrics_registry = Some(metrics);
+RestServer::new(config, router)
+    .serve_with_shutdown(app.addr()?, shutdown_signal())
+    .await?;
+```
+
+标准配置：
+
+```toml
+name = "hello-api"
+mode = "pro"
+
+[server]
+host = "127.0.0.1"
+port = 8080
+timeout_ms = 5000
+max_body_bytes = 1048576
+
+[log]
+mode = "console" # console | file | volume
+encoding = "plain" # plain | json
+level = "info"
+path = "logs"
+rotation = "daily" # daily | size
+compress = false
+keep_days = 0
+max_backups = 0
+max_size_mb = 0
+
+[middlewares]
+metrics = true
+resilience = true
+```
+
+环境变量按 `__` 覆盖嵌套字段，例如 `HELLO_API__SERVER__PORT=8081`。`RUST_LOG` 仍优先覆盖 `[log].level`。
+
 ## Handler Request Extractors
 
 `rzcli api gen` 会生成 `handler` / `logic` 两层，并根据 route request 类型和字段 tag 生成 handler 入参。不要把有 request 的 handler 手写成无参。业务代码优先写在 `src/logic/*`，handler 只做 axum extractor 与 `ApiResponse` 适配。
@@ -144,7 +196,7 @@ service user-api {
 }
 ```
 
-`rzcli api gen` 会在首次生成项目时接入 `AuthConfig`，并生成 `etc/<service>.toml`：
+`rzcli api gen` 会在首次生成项目时通过 `RestServiceConfig` 接入 JWT，并生成 `etc/<service>.toml`：
 
 ```toml
 [auth]
@@ -161,7 +213,7 @@ jwt_expires = 7200
 - `jwt_secret` 支持环境变量和配置文件，环境变量优先。
 - `jwt_expires` 单位是秒，默认 `7200`。
 - `jwt_expires` 供登录/签发 token 逻辑使用；REST middleware 只校验请求里的 JWT，不负责签发 token。
-- `jwt: AdminAuth` 对应 `JWT_ADMIN_AUTH_SECRET` 和 `JWT_ADMIN_AUTH_EXPIRES`。
+- 环境变量固定为 `JWT_AUTH_SECRET` 和 `JWT_AUTH_EXPIRES`；`jwt: AdminAuth` 保留为认证域名，不再改变环境变量名。
 - 空 `jwt_secret` 视为未配置，不能作为有效 secret。
 - `jwtTransition` 会被解析，但当前不会自动启用双 secret 过渡验证。
 
@@ -312,9 +364,11 @@ pub fn router() -> Router<AppState> {
 `RestServer` 默认会应用 rs-zero REST middleware stack。需要显式组合 router 时，可使用 `RestLayerStack`：
 
 ```rust
-use rs_zero::rest::{RestConfig, RestLayerStack};
+use rs_zero::core::RestServiceConfig;
+use rs_zero::rest::RestLayerStack;
 
-let config = RestConfig::production_defaults("hello-api");
+let app_config = RestServiceConfig::load("etc/hello-api", "HELLO_API")?;
+let config = app_config.rest_config();
 let app = RestLayerStack::new(config).layer(router);
 ```
 
